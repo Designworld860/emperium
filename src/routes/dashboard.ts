@@ -11,13 +11,15 @@ dashboard.get('/admin', async (c) => {
 
   const db = c.env.DB
 
-  // Total units stats
+  // Total units stats — use unit_status (new column) with fallback to particulars
   const unitStats = await db.prepare(`
     SELECT 
       COUNT(*) as total_units,
-      SUM(CASE WHEN UPPER(particulars) LIKE '%OCCUPIED%' THEN 1 ELSE 0 END) as occupied,
-      SUM(CASE WHEN UPPER(particulars) LIKE '%VACANT%' THEN 1 ELSE 0 END) as vacant,
-      SUM(CASE WHEN UPPER(particulars) LIKE '%CONSTRUCTION%' THEN 1 ELSE 0 END) as under_construction
+      SUM(CASE WHEN COALESCE(unit_status, particulars) IN ('Occupied by Owner','Occupied by Tenant') THEN 1 ELSE 0 END) as occupied,
+      SUM(CASE WHEN COALESCE(unit_status, particulars) = 'Vacant' THEN 1 ELSE 0 END) as vacant,
+      SUM(CASE WHEN COALESCE(unit_status, particulars) = 'Under Construction' THEN 1 ELSE 0 END) as under_construction,
+      SUM(CASE WHEN COALESCE(unit_status, particulars) = 'Occupied by Owner' THEN 1 ELSE 0 END) as owner_occupied,
+      SUM(CASE WHEN COALESCE(unit_status, particulars) = 'Occupied by Tenant' THEN 1 ELSE 0 END) as tenant_occupied
     FROM units
   `).first<any>()
 

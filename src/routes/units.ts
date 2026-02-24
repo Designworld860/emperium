@@ -53,6 +53,11 @@ units.get('/', async (c) => {
   return c.json({ units: result.results, total: countResult?.total || 0, page, limit })
 })
 
+// ── GET unit status options — must be BEFORE /:unitNo ────────
+units.get('/status-options', async (c) => {
+  return c.json({ statuses: VALID_STATUSES })
+})
+
 // Get single unit by unit_no
 units.get('/:unitNo', async (c) => {
   const user = getAuthUser(c.req.header('Authorization') || null)
@@ -128,6 +133,47 @@ units.put('/:id', async (c) => {
   ).bind(particulars, parseInt(id)).run()
 
   return c.json({ message: 'Unit updated' })
+})
+
+// ── PATCH unit status ─────────────────────────────────────────
+const VALID_STATUSES = ['Vacant', 'Occupied by Owner', 'Occupied by Tenant', 'Under Construction']
+
+units.patch('/:id/status', async (c) => {
+  const user = getAuthUser(c.req.header('Authorization') || null)
+  if (!user || user.type !== 'employee') return c.json({ error: 'Unauthorized' }, 401)
+  if (!['admin', 'sub_admin', 'employee'].includes(user.role as string)) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+
+  const id = parseInt(c.req.param('id'))
+  const { unit_status } = await c.req.json()
+
+  if (!unit_status || !VALID_STATUSES.includes(unit_status)) {
+    return c.json({ error: `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}` }, 400)
+  }
+
+  // Get current unit for audit
+  const existing = await c.env.DB.prepare(`SELECT unit_no, unit_status FROM units WHERE id=?`).bind(id).first<any>()
+  if (!existing) return c.json({ error: 'Unit not found' }, 404)
+
+  await c.env.DB.prepare(
+    `UPDATE units SET unit_status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`
+  ).bind(unit_status, id).run()
+
+  // Also sync particulars for backward compatibility
+  await c.env.DB.prepare(
+    `UPDATE units SET particulars=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`
+  ).bind(unit_status, id).run()
+
+  // Log to property_history if table exists
+  try {
+    await c.env.DB.prepare(
+      `INSERT INTO property_history (unit_id, event_type, description, changed_by_employee_id, changed_at)
+       VALUES (?, 'status_change', ?, ?, CURRENT_TIMESTAMP)`
+    ).bind(id, `Status changed from "${existing.unit_status}" to "${unit_status}"`, user.id).run()
+  } catch (_) { /* table may not have these columns */ }
+
+  return c.json({ message: 'Unit status updated', unit_status })
 })
 
 export default units

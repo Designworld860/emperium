@@ -69,12 +69,30 @@ function roleBadge(role) {
   return `<span class="badge-${role} px-2 py-1 rounded-full text-xs font-semibold">${labels[role] || role}</span>`
 }
 
+const UNIT_STATUSES = ['Vacant','Occupied by Owner','Occupied by Tenant','Under Construction']
+const UNIT_STATUS_STYLE = {
+  'Vacant':              { bg:'#F0FDF4', color:'#15803D', border:'#86EFAC', icon:'fa-door-open' },
+  'Occupied by Owner':   { bg:'#EFF6FF', color:'#1D4ED8', border:'#93C5FD', icon:'fa-home' },
+  'Occupied by Tenant':  { bg:'#FFF7ED', color:'#C2410C', border:'#FDC99B', icon:'fa-user-friends' },
+  'Under Construction':  { bg:'#FEFCE8', color:'#A16207', border:'#FDE047', icon:'fa-hard-hat' },
+}
+function unitStatusBadge(status) {
+  const s = status || 'Vacant'
+  const style = UNIT_STATUS_STYLE[s] || UNIT_STATUS_STYLE['Vacant']
+  return `<span style="background:${style.bg};color:${style.color};border:1px solid ${style.border};padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:5px;">
+    <i class="fas ${style.icon}" style="font-size:10px;"></i>${s}
+  </span>`
+}
 function particularsBadge(p) {
+  // Try to map old particulars to new status style
   const s = p?.toLowerCase()
-  let cls = 'badge-vacant'
-  if (s?.includes('occupied')) cls = 'badge-occupied'
-  if (s?.includes('construction')) cls = 'badge-construction'
-  return `<span class="${cls} px-2 py-1 rounded-full text-xs font-semibold">${p || 'Unknown'}</span>`
+  let mapped = p || 'Vacant'
+  if (s?.includes('owner'))        mapped = 'Occupied by Owner'
+  else if (s?.includes('tenant'))  mapped = 'Occupied by Tenant'
+  else if (s?.includes('occupied'))mapped = 'Occupied by Owner'
+  else if (s?.includes('construction')) mapped = 'Under Construction'
+  else if (s?.includes('vacant'))  mapped = 'Vacant'
+  return unitStatusBadge(mapped)
 }
 
 function kycChip(done) {
@@ -130,139 +148,478 @@ function showLogin() {
 
 function renderLoginPage() {
   return `
-  <div style="min-height:100vh;display:flex;background:#F5EDEB;">
+  <style>
+    /* ══════════════════════════════════════════════════════════
+       LOGIN PAGE — EMPERIUM CITY GRS v3
+       Rich maroon-flame palette · Micro-animations · Modern UI
+    ══════════════════════════════════════════════════════════ */
+    @keyframes lp-fade-up    { from{opacity:0;transform:translateY(28px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes lp-fade-right { from{opacity:0;transform:translateX(-24px)} to{opacity:1;transform:translateX(0)} }
+    @keyframes lp-float      { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
+    @keyframes lp-breathe    { 0%,100%{transform:scale(1)} 50%{transform:scale(1.07)} }
+    @keyframes lp-ripple     { 0%{transform:scale(0.8);opacity:.7} 100%{transform:scale(1.7);opacity:0} }
+    @keyframes lp-spin       { to{transform:rotate(360deg)} }
+    @keyframes lp-spin-rev   { to{transform:rotate(-360deg)} }
+    @keyframes lp-orbit      { from{transform:rotate(var(--start,0deg)) translateX(var(--r,120px)) rotate(calc(-1*var(--start,0deg)))}
+                                to  {transform:rotate(calc(var(--start,0deg)+360deg)) translateX(var(--r,120px)) rotate(calc(-1*(var(--start,0deg)+360deg)))} }
+    @keyframes lp-shimmer    { 0%{background-position:200% center} 100%{background-position:-200% center} }
+    @keyframes lp-pulse-ring { 0%{box-shadow:0 0 0 0 rgba(232,67,26,0.4)} 70%{box-shadow:0 0 0 14px rgba(232,67,26,0)} 100%{box-shadow:0 0 0 0 rgba(232,67,26,0)} }
+    @keyframes lp-bg-shift   { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+    @keyframes lp-dash-spin  { to{stroke-dashoffset:-100} }
 
-    <!-- LEFT BRANDING PANEL -->
-    <div style="flex:1;background:linear-gradient(160deg,#1A0505 0%,#2D0808 35%,#4A1010 70%,#3D0E0E 100%);
-      display:none;flex-direction:column;justify-content:center;align-items:center;
-      padding:48px 40px;position:relative;overflow:hidden;" class="hidden lg:flex">
-      <!-- Decorative glows -->
-      <div style="position:absolute;top:-60px;right:-60px;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,rgba(232,67,26,0.15),transparent 70%);"></div>
-      <div style="position:absolute;bottom:-80px;left:-40px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(201,133,58,0.1),transparent 70%);"></div>
-      <div style="position:absolute;top:60%;right:10%;width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,0.03);"></div>
+    /* Root */
+    .lp-root {
+      min-height: 100vh;
+      display: flex;
+      font-family: 'Inter', system-ui, sans-serif;
+      background: #0D0305;
+    }
 
-      <!-- Logo -->
-      <div style="position:relative;z-index:2;text-align:center;">
-        <img src="/static/emperium-logo.png" alt="Emperium City" style="width:180px;display:block;margin:0 auto 24px;filter:drop-shadow(0 8px 24px rgba(232,67,26,0.4))"/>
-        <h1 style="color:white;font-size:26px;font-weight:800;margin-bottom:10px;">Grievance Redressal System</h1>
-        <p style="color:rgba(255,255,255,0.45);font-size:13.5px;line-height:1.7;max-width:320px;margin:0 auto;">
-          Streamlined complaint management for Emperium City residents &amp; facility staff.
-        </p>
+    /* ── LEFT BRAND PANEL ────────────────────────────────── */
+    .lp-brand {
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(145deg, #1A0508 0%, #2D0A10 30%, #3D1015 60%, #1A0508 100%);
+      background-size: 400% 400%;
+      animation: lp-bg-shift 12s ease infinite;
+    }
+    @media(min-width:1024px) { .lp-brand { display: flex; } }
 
-        <!-- Stats row -->
-        <div style="display:flex;gap:32px;margin-top:40px;justify-content:center;">
-          ${[['213','Total Units'],['5','Departments'],['24/7','Support'],['Fast','Resolution']].map(([num,lbl])=>`
-          <div style="text-align:center;">
-            <div style="font-size:22px;font-weight:800;color:#E8431A;">${num}</div>
-            <div style="font-size:11px;color:rgba(255,255,255,0.35);margin-top:4px;">${lbl}</div>
-          </div>`).join('')}
+    /* Noise texture overlay */
+    .lp-brand::before {
+      content:'';
+      position:absolute; inset:0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      opacity: .6;
+    }
+
+    /* Glow blobs */
+    .lp-blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(60px);
+      pointer-events: none;
+      opacity: .18;
+    }
+
+    /* Stage */
+    .lp-stage {
+      position: relative;
+      width: 320px; height: 320px;
+      display: flex; align-items: center; justify-content: center;
+      z-index: 2;
+    }
+
+    /* Orbit rings */
+    .lp-ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid rgba(232,67,26,.2);
+    }
+    .lp-ring.dashed { border-style: dashed; border-color: rgba(201,133,58,.18); }
+
+    /* Ripple pulses */
+    .lp-pulse {
+      position: absolute; border-radius: 50%;
+      border: 1.5px solid rgba(232,67,26,.25);
+      animation: lp-ripple 3.5s ease-out infinite;
+    }
+
+    /* Orbiting dot wrapper */
+    .lp-orb-wrap {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .lp-orb {
+      position: absolute;
+      top: 50%; left: 50%;
+      border-radius: 50%;
+      animation: lp-orbit linear infinite;
+      transform-origin: 0 0;
+    }
+
+    /* Logo card */
+    .lp-logo-card {
+      position: relative; z-index: 5;
+      background: rgba(255,255,255,0.97);
+      border-radius: 26px;
+      padding: 24px 28px;
+      box-shadow:
+        0 0 0 1px rgba(232,67,26,0.12),
+        0 8px 40px rgba(0,0,0,0.5),
+        0 2px 8px rgba(0,0,0,0.2),
+        inset 0 1px 0 rgba(255,255,255,0.9);
+      animation: lp-float 5s ease-in-out infinite;
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+    }
+    .lp-logo-img {
+      width: 160px;
+      animation: lp-breathe 4s ease-in-out infinite;
+      display: block;
+    }
+    .lp-logo-badge {
+      font-size: 9px; font-weight: 800; letter-spacing: .18em;
+      text-transform: uppercase; color: #E8431A;
+      background: rgba(232,67,26,.08); border-radius: 20px; padding: 3px 14px;
+      border: 1px solid rgba(232,67,26,.15);
+    }
+
+    /* Brand text below stage */
+    .lp-brand-text {
+      position: relative; z-index: 2;
+      text-align: center;
+      margin-top: 32px;
+    }
+    .lp-brand-title {
+      font-size: 26px; font-weight: 800; color: #fff;
+      letter-spacing: -.02em; line-height: 1.2;
+      background: linear-gradient(90deg, #fff 0%, rgba(255,255,255,.7) 50%, #fff 100%);
+      background-size: 200% auto;
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: lp-shimmer 4s linear infinite;
+    }
+    .lp-brand-sub {
+      font-size: 12px; color: rgba(255,255,255,.38); margin-top: 8px; letter-spacing: .04em;
+    }
+
+    /* Feature pills row */
+    .lp-pills {
+      position: relative; z-index: 2;
+      display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+      margin-top: 24px; padding: 0 20px;
+    }
+    .lp-pill {
+      background: rgba(255,255,255,.07);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 20px;
+      padding: 5px 12px;
+      font-size: 10.5px; font-weight: 600; color: rgba(255,255,255,.6);
+      display: flex; align-items: center; gap: 6px;
+      backdrop-filter: blur(6px);
+      transition: all .2s;
+    }
+    .lp-pill:hover { background: rgba(232,67,26,.18); border-color: rgba(232,67,26,.3); color: rgba(255,255,255,.9); }
+    .lp-pill i { color: #E8431A; font-size: 9px; }
+
+    /* ── RIGHT FORM PANEL ────────────────────────────────── */
+    .lp-form {
+      width: min(100%, 480px);
+      min-height: 100vh;
+      background: #fff;
+      display: flex; flex-direction: column;
+      justify-content: center; align-items: center;
+      padding: 40px 48px;
+      position: relative; z-index: 2;
+      box-shadow: -8px 0 60px rgba(0,0,0,0.14);
+      animation: lp-fade-up .5s ease both;
+    }
+    @media(max-width:640px) { .lp-form { padding: 32px 24px; } }
+
+    .lp-form-inner {
+      width: 100%; max-width: 360px;
+      display: flex; flex-direction: column; gap: 0;
+    }
+
+    /* Brand mark */
+    .lp-brandmark {
+      display: flex; align-items: center; gap: 11px;
+      margin-bottom: 40px;
+      animation: lp-fade-right .5s ease both;
+    }
+    .lp-brandmark-icon {
+      width: 44px; height: 44px; border-radius: 13px; flex-shrink: 0;
+      background: linear-gradient(135deg, #E8431A, #5C1010);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 6px 20px rgba(232,67,26,.35), 0 0 0 1px rgba(232,67,26,.2);
+      animation: lp-pulse-ring 3s ease infinite;
+    }
+    .lp-brandmark-name { font-size: 16px; font-weight: 800; color: #111827; line-height: 1.15; letter-spacing: -.02em; }
+    .lp-brandmark-sub  { font-size: 10px; color: #9CA3AF; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; margin-top: 1px; }
+
+    /* Heading */
+    .lp-heading {
+      margin-bottom: 28px;
+      animation: lp-fade-up .55s .08s ease both;
+    }
+    .lp-heading h2 {
+      font-size: 26px; font-weight: 800; color: #111827;
+      letter-spacing: -.03em; line-height: 1.2; margin-bottom: 6px;
+    }
+    .lp-heading p { color: #9CA3AF; font-size: 13.5px; }
+
+    /* Role tabs */
+    .lp-tabs {
+      display: flex;
+      background: #F5EDEB;
+      border-radius: 14px; padding: 4px;
+      margin-bottom: 22px; gap: 4px;
+      animation: lp-fade-up .55s .12s ease both;
+    }
+    .lp-tab {
+      flex: 1; padding: 10px 14px; border-radius: 11px; border: none;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: all .25s; display: flex; align-items: center; justify-content: center; gap: 7px;
+      font-family: inherit;
+    }
+    .lp-tab.on {
+      background: linear-gradient(135deg, #E8431A, #8B1A1A);
+      color: #fff;
+      box-shadow: 0 4px 16px rgba(232,67,26,.38), 0 1px 0 rgba(255,255,255,.1) inset;
+    }
+    .lp-tab.off { background: transparent; color: #9CA3AF; }
+    .lp-tab.off:hover { background: rgba(232,67,26,.08); color: #E8431A; }
+
+    /* Inputs */
+    .lp-field {
+      display: flex; flex-direction: column; gap: 5px;
+      animation: lp-fade-up .55s ease both;
+    }
+    .lp-field-label {
+      font-size: 11px; font-weight: 700; color: #374151;
+      text-transform: uppercase; letter-spacing: .06em;
+    }
+    .lp-field-wrap { position: relative; }
+    .lp-input {
+      width: 100%; padding: 12px 14px 12px 42px;
+      border: 1.5px solid #E5E7EB; border-radius: 12px;
+      font-size: 13.5px; color: #111827; outline: none;
+      transition: border-color .2s, box-shadow .2s, background .2s;
+      font-family: inherit; background: #F9FAFB;
+    }
+    .lp-input:focus {
+      border-color: #E8431A;
+      box-shadow: 0 0 0 4px rgba(232,67,26,.1);
+      background: #fff;
+    }
+    .lp-input::placeholder { color: #C4B5B0; }
+    .lp-ficon {
+      position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+      color: #C4B5B0; font-size: 13px; pointer-events: none;
+      transition: color .2s;
+    }
+    .lp-field-wrap:focus-within .lp-ficon { color: #E8431A; }
+
+    /* Submit button */
+    .lp-btn {
+      width: 100%; padding: 13px;
+      border: none; border-radius: 13px;
+      background: linear-gradient(135deg, #E8431A 0%, #C0341A 45%, #8B1A1A 100%);
+      color: #fff; font-size: 14px; font-weight: 700; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 9px;
+      transition: all .25s;
+      box-shadow: 0 4px 24px rgba(232,67,26,.42), 0 1px 0 rgba(255,255,255,.15) inset;
+      letter-spacing: .02em;
+      font-family: inherit;
+      position: relative; overflow: hidden;
+    }
+    .lp-btn::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,.15), transparent);
+      opacity: 0; transition: opacity .2s;
+    }
+    .lp-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 36px rgba(232,67,26,.52); }
+    .lp-btn:hover::after { opacity: 1; }
+    .lp-btn:active { transform: translateY(0); box-shadow: 0 2px 12px rgba(232,67,26,.38); }
+
+    /* Divider */
+    .lp-divider {
+      display: flex; align-items: center; gap: 12px; color: #D1D5DB;
+      font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+    }
+    .lp-divider::before,.lp-divider::after {
+      content: ''; flex: 1; height: 1px; background: #F3F4F6;
+    }
+
+    /* Demo rows */
+    .lp-demo-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+      animation: lp-fade-up .55s .2s ease both;
+    }
+    .lp-demo-row {
+      display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+      border-radius: 11px; cursor: pointer;
+      transition: all .18s;
+      border: 1.5px solid #F3F4F6;
+      background: #FAFAFA;
+    }
+    .lp-demo-row:hover {
+      background: #FFF5F3; border-color: rgba(232,67,26,.25);
+      transform: translateY(-1px);
+      box-shadow: 0 3px 10px rgba(232,67,26,.1);
+    }
+    .lp-demo-avatar {
+      width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .lp-demo-name { font-size: 11.5px; font-weight: 700; color: #374151; line-height: 1.2; }
+    .lp-demo-hint { font-size: 10px; color: #9CA3AF; }
+
+    /* Footer */
+    .lp-footer {
+      text-align: center; font-size: 10.5px; color: #D1D5DB; margin-top: 24px;
+      animation: lp-fade-up .55s .25s ease both;
+    }
+  </style>
+
+  <div class="lp-root" id="loginPage">
+
+    <!-- ══ LEFT: BRAND ════════════════════════════════════════ -->
+    <div class="lp-brand">
+      <!-- Blob glows -->
+      <div class="lp-blob" style="width:420px;height:420px;background:radial-gradient(#E8431A,transparent);top:-60px;left:-80px;"></div>
+      <div class="lp-blob" style="width:300px;height:300px;background:radial-gradient(#C9853A,transparent);bottom:60px;right:-40px;opacity:.12;"></div>
+      <div class="lp-blob" style="width:200px;height:200px;background:radial-gradient(#8B1A1A,transparent);top:50%;left:60%;opacity:.2;"></div>
+
+      <!-- Stage -->
+      <div class="lp-stage">
+        <!-- Pulse rings -->
+        <div class="lp-pulse" style="width:220px;height:220px;animation-delay:0s;"></div>
+        <div class="lp-pulse" style="width:220px;height:220px;animation-delay:1.2s;"></div>
+        <div class="lp-pulse" style="width:220px;height:220px;animation-delay:2.4s;"></div>
+
+        <!-- Static rings -->
+        <div class="lp-ring" style="width:240px;height:240px;animation:lp-spin 22s linear infinite;"></div>
+        <div class="lp-ring dashed" style="width:300px;height:300px;animation:lp-spin-rev 30s linear infinite;"></div>
+
+        <!-- Orbiting dots -->
+        <div class="lp-orb-wrap">
+          <div class="lp-orb" style="width:10px;height:10px;background:#E8431A;border-radius:50%;--start:0deg;--r:120px;animation-duration:10s;margin:-5px 0 0 -5px;box-shadow:0 0 8px #E8431A;"></div>
+        </div>
+        <div class="lp-orb-wrap">
+          <div class="lp-orb" style="width:7px;height:7px;background:#C9853A;border-radius:50%;--start:180deg;--r:150px;animation-duration:17s;margin:-3.5px 0 0 -3.5px;box-shadow:0 0 6px #C9853A;"></div>
+        </div>
+        <div class="lp-orb-wrap">
+          <div class="lp-orb" style="width:5px;height:5px;background:#fff;border-radius:50%;--start:90deg;--r:150px;animation-duration:22s;margin:-2.5px 0 0 -2.5px;opacity:.4;"></div>
         </div>
 
-        <!-- Feature pills -->
-        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:32px;justify-content:center;">
-          ${[['fa-bolt','Real-time Tracking'],['fa-shield-alt','Secure Portal'],['fa-calendar-check','Visit Scheduling'],['fa-car','Vehicle Registry']].map(([ic,lbl])=>`
-          <div style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:6px 14px;font-size:12px;color:rgba(255,255,255,0.6);display:flex;align-items:center;gap:6px;">
-            <i class="fas ${ic}" style="color:#E8431A;"></i>${lbl}
-          </div>`).join('')}
+        <!-- Logo Card -->
+        <div class="lp-logo-card">
+          <img src="/static/emperium-logo.png" alt="Emperium City" class="lp-logo-img"/>
+          <div class="lp-logo-badge">Grievance Redressal System</div>
         </div>
+      </div>
+
+      <!-- Brand text -->
+      <div class="lp-brand-text">
+        <div class="lp-brand-title">Emperium City</div>
+        <div class="lp-brand-sub">Smarter living · Faster resolutions</div>
+      </div>
+
+      <!-- Feature pills -->
+      <div class="lp-pills">
+        <div class="lp-pill"><i class="fas fa-bolt"></i>Real-time Tracking</div>
+        <div class="lp-pill"><i class="fas fa-calendar-check"></i>Visit Scheduling</div>
+        <div class="lp-pill"><i class="fas fa-car"></i>Vehicle Registry</div>
+        <div class="lp-pill"><i class="fas fa-shield-alt"></i>Secure & Private</div>
       </div>
     </div>
 
-    <!-- RIGHT LOGIN PANEL -->
-    <div style="width:min(100%,460px);min-height:100vh;background:white;display:flex;flex-direction:column;
-      justify-content:center;align-items:center;padding:40px 36px;
-      box-shadow:-4px 0 40px rgba(0,0,0,0.08);">
+    <!-- ══ RIGHT: FORM ════════════════════════════════════════ -->
+    <div class="lp-form">
+      <div class="lp-form-inner">
 
-      <!-- Mobile logo (shown on small screens) -->
-      <div class="lg:hidden" style="text-align:center;margin-bottom:28px;">
-        <img src="/static/emperium-logo.png" alt="Emperium" style="width:120px;margin:0 auto 8px;display:block;"/>
-        <p style="font-size:11px;color:#9CA3AF;letter-spacing:0.08em;text-transform:uppercase;font-weight:700;">Grievance Redressal System</p>
-      </div>
-
-      <div style="width:100%;max-width:360px;">
-        <!-- Header -->
-        <div style="margin-bottom:28px;">
-          <h2 style="font-size:24px;font-weight:800;color:#111827;margin-bottom:6px;">Welcome back</h2>
-          <p style="color:#9CA3AF;font-size:13.5px;">Sign in to access your GRS portal</p>
+        <!-- Brand mark -->
+        <div class="lp-brandmark">
+          <div class="lp-brandmark-icon">
+            <i class="fas fa-shield-alt" style="color:#fff;font-size:18px;"></i>
+          </div>
+          <div>
+            <div class="lp-brandmark-name">Emperium City</div>
+            <div class="lp-brandmark-sub">GRS Portal</div>
+          </div>
         </div>
 
-        <!-- Tab switcher -->
-        <div style="display:flex;background:#F5EDEB;border-radius:12px;padding:4px;margin-bottom:24px;gap:4px;">
-          <button id="tabCust" onclick="switchLoginTab('customer')"
-            style="flex:1;padding:9px 16px;border-radius:9px;border:none;font-size:13px;font-weight:600;
-            cursor:pointer;transition:all 0.2s;background:linear-gradient(135deg,#E8431A,#8B1A1A);color:white;
-            box-shadow:0 2px 8px rgba(232,67,26,0.32);">
-            <i class="fas fa-user" style="margin-right:6px;"></i>Resident
-          </button>
-          <button id="tabEmp" onclick="switchLoginTab('employee')"
-            style="flex:1;padding:9px 16px;border-radius:9px;border:none;font-size:13px;font-weight:600;
-            cursor:pointer;transition:all 0.2s;background:transparent;color:#6B7280;">
-            <i class="fas fa-user-tie" style="margin-right:6px;"></i>Staff
-          </button>
+        <!-- Heading -->
+        <div class="lp-heading">
+          <h2>Welcome back 👋</h2>
+          <p>Sign in to access the Grievance Redressal System</p>
         </div>
 
+        <!-- Role Tabs -->
+        <div class="lp-tabs">
+          <button id="tabCust" onclick="switchLoginTab('customer')" class="lp-tab on">
+            <i class="fas fa-home" style="font-size:12px;"></i>Resident
+          </button>
+          <button id="tabEmp" onclick="switchLoginTab('employee')" class="lp-tab off">
+            <i class="fas fa-user-tie" style="font-size:12px;"></i>Staff / Admin
+          </button>
+        </div>
         <div id="loginType" style="display:none;">customer</div>
 
-        <!-- Login form -->
-        <form onsubmit="doLogin(event)">
-          <div style="margin-bottom:16px;">
-            <label class="form-label">Email Address</label>
-            <div style="position:relative;">
-              <i class="fas fa-envelope" style="position:absolute;left:13px;top:50%;transform:translateY(-50%);color:#C4B5B0;font-size:13px;"></i>
-              <input id="loginEmail" type="email" autocomplete="email" class="form-input"
-                style="padding-left:38px;" placeholder="your@email.com" required/>
+        <!-- Form -->
+        <form onsubmit="doLogin(event)" style="display:flex;flex-direction:column;gap:14px;margin-bottom:22px;">
+          <div class="lp-field" style="animation-delay:.14s;">
+            <label class="lp-field-label">Email Address</label>
+            <div class="lp-field-wrap">
+              <i class="fas fa-envelope lp-ficon"></i>
+              <input id="loginEmail" type="email" autocomplete="email" class="lp-input" placeholder="you@example.com" required/>
             </div>
           </div>
-          <div style="margin-bottom:22px;">
-            <label class="form-label">Password</label>
-            <div style="position:relative;">
-              <i class="fas fa-lock" style="position:absolute;left:13px;top:50%;transform:translateY(-50%);color:#C4B5B0;font-size:13px;"></i>
-              <input id="loginPwd" type="password" autocomplete="current-password" class="form-input"
-                style="padding-left:38px;padding-right:42px;" placeholder="Enter password" required/>
-              <button type="button" onclick="togglePwd()" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#C4B5B0;font-size:14px;">
+
+          <div class="lp-field" style="animation-delay:.18s;">
+            <label class="lp-field-label">Password</label>
+            <div class="lp-field-wrap">
+              <i class="fas fa-lock lp-ficon"></i>
+              <input id="loginPwd" type="password" autocomplete="current-password" class="lp-input" style="padding-right:46px;" placeholder="Enter your password" required/>
+              <button type="button" onclick="togglePwd()" style="position:absolute;right:13px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#C4B5B0;font-size:13px;padding:0;transition:color .2s;"
+                onmouseover="this.style.color='#E8431A'" onmouseout="this.style.color='#C4B5B0'">
                 <i class="fas fa-eye" id="pwdIcon"></i>
               </button>
             </div>
           </div>
-          <button type="submit" class="btn-primary" style="width:100%;justify-content:center;padding:11px;font-size:14px;border-radius:11px;">
-            <i class="fas fa-sign-in-alt"></i>Sign In
+
+          <button type="submit" class="lp-btn" style="margin-top:6px;animation:lp-fade-up .55s .22s ease both;">
+            <i class="fas fa-arrow-right-to-bracket" style="font-size:14px;"></i>
+            Sign In Securely
           </button>
         </form>
 
         <!-- Demo credentials -->
-        <div style="margin-top:24px;background:#FFF5F2;border:1px solid #FDDDD4;border-radius:12px;padding:14px 16px;">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-            <div style="width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#E8431A,#8B1A1A);display:flex;align-items:center;justify-content:center;">
-              <i class="fas fa-info" style="color:white;font-size:10px;"></i>
-            </div>
-            <span style="font-weight:700;font-size:12px;color:#8B1A1A;">Demo Credentials</span>
-          </div>
-          <div style="display:grid;gap:6px;">
-            ${[['Admin','admin@emperiumcity.com','Admin@123'],['Sub-Admin','subadmin@emperiumcity.com','SubAdmin@123'],['Employee','rajesh@emperiumcity.com','Emp@123'],['Resident','kapoorminakshi124@gmail.com','Customer@123']].map(([role,email,pwd])=>`
-            <div onclick="document.getElementById('loginEmail').value='${email}';document.getElementById('loginPwd').value='${pwd}';" style="cursor:pointer;display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:7px;transition:background 0.15s;" onmouseover="this.style.background='rgba(232,67,26,0.06)'" onmouseout="this.style.background='transparent'">
-              <span style="font-size:10px;font-weight:700;color:#E8431A;background:#FEE2D5;border-radius:4px;padding:2px 6px;min-width:60px;text-align:center;">${role}</span>
-              <span style="font-size:11.5px;color:#4B5563;font-family:monospace;">${email}</span>
+        <div style="animation:lp-fade-up .55s .18s ease both;">
+          <div class="lp-divider" style="margin-bottom:14px;">Quick Demo Access</div>
+          <div class="lp-demo-grid">
+            ${[
+              ['Admin',     'admin@emperiumcity.com',      'Admin@123',    'fa-crown',       '#DC2626','#FEF2F2'],
+              ['Sub-Admin', 'subadmin@emperiumcity.com',   'SubAdmin@123', 'fa-user-shield', '#7C3AED','#F5F3FF'],
+              ['Employee',  'rajesh@emperiumcity.com',     'Emp@123',      'fa-hard-hat',    '#0284C7','#EFF6FF'],
+              ['Resident',  'kapoorminakshi124@gmail.com', 'Customer@123', 'fa-home',        '#059669','#F0FDF4']
+            ].map(([role,email,pwd,ic,color,bg])=>`
+            <div class="lp-demo-row" onclick="document.getElementById('loginEmail').value='${email}';document.getElementById('loginPwd').value='${pwd}';" title="${email}">
+              <div class="lp-demo-avatar" style="background:${bg};">
+                <i class="fas ${ic}" style="color:${color};font-size:11px;"></i>
+              </div>
+              <div style="flex:1;min-width:0;">
+                <div class="lp-demo-name">${role}</div>
+                <div class="lp-demo-hint" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${email.split('@')[0]}@…</div>
+              </div>
+              <i class="fas fa-chevron-right" style="color:#E8431A;font-size:8px;opacity:.4;flex-shrink:0;"></i>
             </div>`).join('')}
           </div>
-          <p style="font-size:10.5px;color:#9CA3AF;margin-top:8px;text-align:center;">Click any row to auto-fill credentials</p>
         </div>
 
         <!-- Footer -->
-        <p style="text-align:center;font-size:11px;color:#C4B5B0;margin-top:20px;">
-          &copy; 2026 Emperium City &bull; GRS Portal v2.0
-        </p>
+        <p class="lp-footer">&copy; 2026 Emperium City &nbsp;&bull;&nbsp; Grievance Redressal System &nbsp;&bull;&nbsp; v3.0</p>
       </div>
     </div>
+
   </div>`
 }
 
 function switchLoginTab(type) {
   document.getElementById('loginType').textContent = type
   const isCust = type === 'customer'
-  const activeStyle = 'background:linear-gradient(135deg,#E8431A,#8B1A1A);color:white;box-shadow:0 2px 8px rgba(232,67,26,0.32);'
-  const inactiveStyle = 'background:transparent;color:#6B7280;box-shadow:none;'
-  document.getElementById('tabCust').style.cssText = document.getElementById('tabCust').style.cssText.replace(/background:[^;]+;|color:[^;]+;|box-shadow:[^;]+;/g,'') + (isCust ? activeStyle : inactiveStyle)
-  document.getElementById('tabEmp').style.cssText = document.getElementById('tabEmp').style.cssText.replace(/background:[^;]+;|color:[^;]+;|box-shadow:[^;]+;/g,'') + (!isCust ? activeStyle : inactiveStyle)
+  const tabCust = document.getElementById('tabCust')
+  const tabEmp  = document.getElementById('tabEmp')
+  if (tabCust) { tabCust.className = 'lp-tab ' + (isCust  ? 'on' : 'off') }
+  if (tabEmp)  { tabEmp.className  = 'lp-tab ' + (!isCust ? 'on' : 'off') }
 }
 
 function togglePwd() {
@@ -335,6 +692,9 @@ function showApp() {
         ${isStaff ? `<div class="nav-section-label" style="margin-top:4px;">Scheduling</div>` : ''}
         ${isStaff ? navItem('calendar', 'My Calendar', 'fa-calendar-alt') : ''}
         ${isStaff ? navItem('leave-mgmt', 'Leave Management', 'fa-umbrella-beach') : ''}
+
+        ${isStaff ? `<div class="nav-section-label" style="margin-top:4px;">Internal</div>` : ''}
+        ${isStaff ? navItem('internal-complaints', 'Internal Complaints', 'fa-comment-dots') : ''}
 
         <div class="nav-section-label" style="margin-top:4px;">System</div>
         ${navItem('complaints-master', 'Complaints Master', 'fa-layer-group')}
@@ -422,6 +782,7 @@ function navigate(page, params = {}) {
     'leave-mgmt': loadLeaveManagement,
     vehicles: loadVehicles,
     'complaints-master': loadComplaintsMaster,
+    'internal-complaints': loadInternalComplaints,
     'kyc-manage': (p) => {
       if (p && p.ownerEntityType) {
         openManageKyc(p.ownerEntityType, p.ownerEntityId, p.ownerName, p.unitNo, p.tenantEntityType, p.tenantEntityId, p.tenantName)
@@ -572,7 +933,7 @@ async function loadAdminDashboard() {
       <i class="fas fa-building stat-icon"></i>
       <div class="stat-number">${us.total_units || 0}</div>
       <div class="stat-label">Total Units</div>
-      <div class="stat-sub">${us.occupied || 0} Occupied &bull; ${us.vacant || 0} Vacant</div>
+      <div class="stat-sub">${us.occupied || 0} Occupied &bull; ${us.vacant || 0} Vacant &bull; ${us.under_construction || 0} Under Const.</div>
     </div>
     <div class="stat-card sc-green">
       <i class="fas fa-users stat-icon"></i>
@@ -1272,9 +1633,13 @@ async function loadUnits(params = {}) {
   const units = r.data.units || []
   const total = r.data.total || 0
 
-  const occupied = units.filter(u => u.particulars?.toUpperCase().includes('OCCUPIED')).length
-  const vacant = units.filter(u => u.particulars?.toUpperCase().includes('VACANT')).length
-  const construction = units.filter(u => u.particulars?.toUpperCase().includes('CONSTRUCTION')).length
+  // Use unit_status (new column) for accurate counting
+  const getStatus = u => u.unit_status || u.particulars || 'Vacant'
+  const ownerOcc   = units.filter(u => getStatus(u) === 'Occupied by Owner').length
+  const tenantOcc  = units.filter(u => getStatus(u) === 'Occupied by Tenant').length
+  const occupied   = ownerOcc + tenantOcc
+  const vacant     = units.filter(u => getStatus(u) === 'Vacant').length
+  const construction = units.filter(u => getStatus(u) === 'Under Construction').length
 
   document.getElementById('pageContent').innerHTML = `
   <div class="page-header">
@@ -1282,7 +1647,7 @@ async function loadUnits(params = {}) {
       <div class="page-title-icon"><i class="fas fa-building"></i></div>
       <div>
         <div>Unit Registry</div>
-        <div class="page-subtitle">${total} units &bull; ${occupied} occupied &bull; ${vacant} vacant</div>
+        <div class="page-subtitle">${total} units &bull; ${occupied} occupied &bull; ${vacant} vacant &bull; ${construction} under construction</div>
       </div>
     </div>
     <div class="page-actions">
@@ -1292,15 +1657,22 @@ async function loadUnits(params = {}) {
       </div>
       <select id="unitFilter" onchange="filterUnits(document.getElementById('unitSearch').value)" class="filter-select">
         <option value="">All Status</option>
-        <option value="occupied">Occupied</option>
+        <option value="occupied by owner">Owner Occupied</option>
+        <option value="occupied by tenant">Tenant Occupied</option>
         <option value="vacant">Vacant</option>
-        <option value="construction">Under Construction</option>
+        <option value="under construction">Under Construction</option>
       </select>
     </div>
   </div>
 
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px;">
-    ${[['Total Units',total,'sc-flame','fa-building'],['Occupied',occupied,'sc-green','fa-user-check'],['Vacant',vacant,'sc-teal','fa-door-open'],['Under Const.',construction,'sc-gold','fa-hard-hat']].map(([l,v,cls,ic]) => `
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:18px;">
+    ${[
+      ['Total',total,'sc-flame','fa-building'],
+      ['Owner Occ.',ownerOcc,'sc-blue','fa-home'],
+      ['Tenant Occ.',tenantOcc,'sc-green','fa-user-friends'],
+      ['Vacant',vacant,'sc-teal','fa-door-open'],
+      ['Under Const.',construction,'sc-gold','fa-hard-hat']
+    ].map(([l,v,cls,ic]) => `
     <div class="stat-card ${cls}">
       <i class="fas ${ic} stat-icon"></i>
       <div class="stat-number">${v}</div>
@@ -1330,8 +1702,11 @@ async function loadUnits(params = {}) {
 }
 
 function renderUnitRows(units) {
-  return units.map(u => `
-  <tr class="table-row border-t">
+  const isStaff = currentUser && currentUser.type === 'employee'
+  return units.map(u => {
+    const status = u.unit_status || u.particulars || 'Vacant'
+    return `
+  <tr class="table-row border-t" id="unit-row-${u.id}">
     <td class="px-4 py-3 font-bold text-blue-900 cursor-pointer hover:underline" onclick="showUnitDetail('${u.unit_no}')">Unit ${u.unit_no}</td>
     <td class="px-4 py-3">
       <div class="font-medium">${u.owner_name || '—'}</div>
@@ -1340,13 +1715,22 @@ function renderUnitRows(units) {
     <td class="px-4 py-3 hidden md:table-cell">
       ${u.tenant_name ? `<div class="text-sm">${u.tenant_name}</div><div class="text-xs text-orange-400">${u.tenancy_expiry ? 'Exp: '+formatDate(u.tenancy_expiry) : ''}</div>` : '<span class="text-gray-300">—</span>'}
     </td>
-    <td class="px-4 py-3">${particularsBadge(u.particulars)}</td>
+    <td class="px-4 py-3" id="unit-status-cell-${u.id}">
+      ${isStaff ? `
+      <div style="display:flex;align-items:center;gap:6px;">
+        ${unitStatusBadge(status)}
+        <button onclick="showUnitStatusModal(${u.id},'${u.unit_no}','${status}')"
+          style="width:22px;height:22px;border-radius:6px;border:1px solid #E5E7EB;background:white;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;" title="Change status">
+          <i class="fas fa-pencil-alt" style="font-size:10px;color:#9CA3AF;"></i>
+        </button>
+      </div>` : unitStatusBadge(status)}
+    </td>
     <td class="px-4 py-3 text-gray-500 hidden md:table-cell">${u.billing_area} ${u.area_unit}</td>
     <td class="px-4 py-3">
-      <button onclick="showUnitDetail('${u.unit_no}')" class="text-blue-600 hover:text-blue-800 mr-2"><i class="fas fa-eye"></i></button>
-      <button onclick="showAddComplaintForUnit(${u.id},'${u.unit_no}')" class="text-orange-500 hover:text-orange-700"><i class="fas fa-exclamation-circle"></i></button>
+      <button onclick="showUnitDetail('${u.unit_no}')" class="text-blue-600 hover:text-blue-800 mr-2" title="View detail"><i class="fas fa-eye"></i></button>
+      <button onclick="showAddComplaintForUnit(${u.id},'${u.unit_no}')" class="text-orange-500 hover:text-orange-700" title="Register complaint"><i class="fas fa-exclamation-circle"></i></button>
     </td>
-  </tr>`).join('')
+  </tr>`}).join('')
 }
 
 function filterUnits(search) {
@@ -1362,12 +1746,98 @@ function filterUnits(search) {
   })
 }
 
+// ── Unit Status Modal ─────────────────────────────────────────
+function showUnitStatusModal(unitId, unitNo, currentStatus) {
+  const opts = UNIT_STATUSES.map(s => {
+    const style = UNIT_STATUS_STYLE[s]
+    const isSelected = s === currentStatus
+    return `<label style="display:block;cursor:pointer;margin-bottom:8px;">
+      <input type="radio" name="newUnitStatus" value="${s}" ${isSelected?'checked':''} style="display:none;" />
+      <div onclick="this.previousElementSibling.checked=true;document.querySelectorAll('.us-opt').forEach(el=>el.style.borderColor='#E5E7EB');this.style.borderColor='${style.color}';"
+        class="us-opt" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;border:2px solid ${isSelected?style.color:'#E5E7EB'};background:${isSelected?style.bg:'white'};transition:all .15s;">
+        <div style="width:32px;height:32px;border-radius:8px;background:${style.bg};border:1px solid ${style.border};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i class="fas ${style.icon}" style="color:${style.color};font-size:14px;"></i>
+        </div>
+        <div>
+          <div style="font-weight:700;font-size:13px;color:#111827;">${s}</div>
+          ${{
+            'Vacant':'Unit is currently unoccupied',
+            'Occupied by Owner':'Owner is residing in the unit',
+            'Occupied by Tenant':'Tenant is residing in the unit',
+            'Under Construction':'Unit undergoing construction/renovation'
+          }[s] ? `<div style="font-size:11px;color:#9CA3AF;">${{
+            'Vacant':'Unit is currently unoccupied',
+            'Occupied by Owner':'Owner is residing in the unit',
+            'Occupied by Tenant':'Tenant is residing in the unit',
+            'Under Construction':'Unit undergoing construction/renovation'
+          }[s]}</div>` : ''}
+        </div>
+        ${isSelected ? `<div style="margin-left:auto;"><i class="fas fa-check-circle" style="color:${style.color};font-size:16px;"></i></div>` : ''}
+      </div>
+    </label>`
+  }).join('')
+
+  showModal(`
+    <div style="padding:0;">
+      <div style="background:linear-gradient(135deg,#1E40AF,#1D4ED8);padding:18px 22px;border-radius:14px 14px 0 0;display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:36px;height:36px;background:rgba(255,255,255,0.15);border-radius:9px;display:flex;align-items:center;justify-content:center;">
+            <i class="fas fa-building" style="color:white;font-size:16px;"></i>
+          </div>
+          <div style="color:white;">
+            <div style="font-weight:700;font-size:15px;">Update Unit Status</div>
+            <div style="font-size:11px;opacity:0.8;">Unit ${unitNo}</div>
+          </div>
+        </div>
+        <button onclick="closeModal()" style="background:rgba(255,255,255,0.15);border:none;border-radius:8px;padding:6px 10px;cursor:pointer;color:white;font-size:14px;"><i class="fas fa-times"></i></button>
+      </div>
+      <div style="padding:20px 22px;">
+        <input type="hidden" id="statusUnitId" value="${unitId}" />
+        ${opts}
+        <div style="display:flex;gap:10px;margin-top:16px;">
+          <button onclick="submitUnitStatus()" style="flex:1;padding:11px;background:linear-gradient(135deg,#1D4ED8,#1E40AF);color:white;border:none;border-radius:10px;font-weight:700;font-size:13.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+            <i class="fas fa-check"></i>Update Status
+          </button>
+          <button onclick="closeModal()" style="flex:0 0 auto;padding:11px 20px;border:1.5px solid #E5E7EB;border-radius:10px;background:white;color:#6B7280;cursor:pointer;font-weight:600;">Cancel</button>
+        </div>
+      </div>
+    </div>
+  `)
+}
+
+async function submitUnitStatus() {
+  const unitId = document.getElementById('statusUnitId').value
+  const selected = document.querySelector('input[name="newUnitStatus"]:checked')
+  if (!selected) { toast('Select a status', 'error'); return }
+  const unit_status = selected.value
+  const r = await api('PATCH', `/units/${unitId}/status`, { unit_status })
+  if (r?.ok) {
+    toast('Unit status updated!', 'success')
+    closeModal()
+    // Refresh just the status cell without full reload
+    const cell = document.getElementById(`unit-status-cell-${unitId}`)
+    if (cell) {
+      cell.innerHTML = `<div style="display:flex;align-items:center;gap:6px;">
+        ${unitStatusBadge(unit_status)}
+        <button onclick="showUnitStatusModal(${unitId},'','${unit_status}')"
+          style="width:22px;height:22px;border-radius:6px;border:1px solid #E5E7EB;background:white;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i class="fas fa-pencil-alt" style="font-size:10px;color:#9CA3AF;"></i>
+        </button>
+      </div>`
+    }
+  } else {
+    toast(r?.data?.error || 'Failed to update status', 'error')
+  }
+}
+
 async function showUnitDetail(unitNo) {
   const r = await api('GET', `/units/${unitNo}`)
   if (!r?.ok) { toast('Unit not found', 'error'); return }
   const { unit, owner, tenant, owner_kyc, tenant_kyc, complaint_stats, property_history } = r.data
 
   const isAdmin = ['admin', 'sub_admin'].includes(currentUser.role)
+  const isStaff = currentUser.type === 'employee'
+  const currentStatus = unit.unit_status || unit.particulars || 'Vacant'
 
   showModal(`
   <div class="flex justify-between items-center mb-4">
@@ -1375,9 +1845,13 @@ async function showUnitDetail(unitNo) {
     <button onclick="closeModal()" class="text-gray-400"><i class="fas fa-times text-xl"></i></button>
   </div>
 
-  <div class="flex gap-2 mb-4">
-    ${particularsBadge(unit.particulars)}
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+    ${unitStatusBadge(currentStatus)}
     <span class="text-gray-500 text-sm">${unit.billing_area} ${unit.area_unit}</span>
+    ${isStaff ? `<button onclick="closeModal();showUnitStatusModal(${unit.id},'${unit.unit_no}','${currentStatus}')"
+      style="margin-left:auto;background:#EFF6FF;border:1px solid #BFDBFE;color:#1D4ED8;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;">
+      <i class="fas fa-exchange-alt" style="font-size:11px;"></i>Change Status
+    </button>` : ''}
   </div>
 
   <div class="grid md:grid-cols-2 gap-4 mb-4">
@@ -3213,102 +3687,868 @@ function viewRcDocument(vehicleId) {
 // ══════════════════════════════════════════════════════════════
 // ── COMPLAINTS MASTER ────────────────────────────────────────
 // ══════════════════════════════════════════════════════════════
+
+// Color palette pool for dynamic categories
+const CAT_COLOR_POOL = [
+  { bg:'#EFF6FF', border:'#BFDBFE', icon:'#2563EB', badge:'#DBEAFE', badgeText:'#1E40AF', accent:'#3B82F6' },
+  { bg:'#FFFBEB', border:'#FDE68A', icon:'#D97706', badge:'#FEF3C7', badgeText:'#92400E', accent:'#F59E0B' },
+  { bg:'#ECFDF5', border:'#A7F3D0', icon:'#059669', badge:'#D1FAE5', badgeText:'#065F46', accent:'#10B981' },
+  { bg:'#F5F3FF', border:'#DDD6FE', icon:'#7C3AED', badge:'#EDE9FE', badgeText:'#4C1D95', accent:'#8B5CF6' },
+  { bg:'#FFF5F3', border:'#FDDDD4', icon:'#E8431A', badge:'#FEE2D5', badgeText:'#7C2D12', accent:'#E8431A' },
+  { bg:'#F0FDF4', border:'#BBF7D0', icon:'#16A34A', badge:'#DCFCE7', badgeText:'#14532D', accent:'#22C55E' },
+  { bg:'#FFF1F2', border:'#FECDD3', icon:'#E11D48', badge:'#FFE4E6', badgeText:'#881337', accent:'#F43F5E' },
+  { bg:'#F0F9FF', border:'#BAE6FD', icon:'#0284C7', badge:'#E0F2FE', badgeText:'#0C4A6E', accent:'#0EA5E9' },
+]
+
+const CAT_ICON_OPTIONS = [
+  'fa-tint','fa-bolt','fa-hammer','fa-receipt','fa-ellipsis-h','fa-tools',
+  'fa-fire','fa-leaf','fa-car','fa-wifi','fa-shield-alt','fa-cog',
+  'fa-water','fa-lightbulb','fa-wrench','fa-trash','fa-building','fa-lock'
+]
+
+function getCatColor(idx) { return CAT_COLOR_POOL[idx % CAT_COLOR_POOL.length] }
+
 async function loadComplaintsMaster() {
   const content = document.getElementById('pageContent')
   content.innerHTML = `<div class="loading"><div class="spinner"></div></div>`
 
+  const isAdmin = ['admin','sub_admin'].includes(currentUser?.role)
+
+  // Admins see all (incl. inactive); others see active only
   const [catR, subCatR] = await Promise.all([
-    api('GET', '/complaints/categories/list'),
-    api('GET', '/complaints/sub-categories/list')
+    isAdmin ? api('GET', '/complaints/categories/all') : api('GET', '/complaints/categories/list'),
+    isAdmin ? api('GET', '/complaints/sub-categories/all') : api('GET', '/complaints/sub-categories/list')
   ])
   const categories = catR?.data?.categories || []
   const subCategories = subCatR?.data?.sub_categories || []
   const subByCat = {}
   subCategories.forEach(sc => { if (!subByCat[sc.category_id]) subByCat[sc.category_id] = []; subByCat[sc.category_id].push(sc) })
 
-  const catIcons = { Plumbing:'fa-tint', Electricity:'fa-bolt', Civil:'fa-hammer', Billing:'fa-receipt', Miscellaneous:'fa-ellipsis-h' }
-  const catColors = { Plumbing:'blue', Electricity:'yellow', Civil:'green', Billing:'purple', Miscellaneous:'gray' }
+  const totalActive   = categories.filter(c => c.is_active).length
+  const totalInactive = categories.filter(c => !c.is_active).length
+  const totalSubs     = subCategories.length
+  const activeSubs    = subCategories.filter(s => s.is_active).length
 
-  const catColorMap = {
-    Plumbing:   { bg:'#EFF6FF', border:'#BFDBFE', icon:'#2563EB', badge:'#DBEAFE', badgeText:'#1E40AF' },
-    Electricity:{ bg:'#FFFBEB', border:'#FDE68A', icon:'#D97706', badge:'#FEF3C7', badgeText:'#92400E' },
-    Civil:      { bg:'#ECFDF5', border:'#A7F3D0', icon:'#059669', badge:'#D1FAE5', badgeText:'#065F46' },
-    Billing:    { bg:'#F5F3FF', border:'#DDD6FE', icon:'#7C3AED', badge:'#EDE9FE', badgeText:'#4C1D95' },
-    Miscellaneous:{ bg:'#FFF5F3', border:'#FDDDD4', icon:'#E8431A', badge:'#FEE2D5', badgeText:'#7C2D12' }
-  }
   content.innerHTML = `
-  <div style="display:flex;flex-direction:column;gap:18px;">
+  <div style="display:flex;flex-direction:column;gap:20px;">
+
+    <!-- Page Header -->
     <div class="page-header">
       <div class="page-title">
         <div class="page-title-icon"><i class="fas fa-layer-group"></i></div>
         <div>
           <div>Complaints Master</div>
-          <div class="page-subtitle">${categories.length} complaint types &bull; ${subCategories.length} sub-types configured</div>
+          <div class="page-subtitle">${categories.length} complaint types &bull; ${totalSubs} sub-types configured</div>
         </div>
       </div>
-      <button onclick="showRegisterComplaint()" class="btn-primary"><i class="fas fa-plus"></i>Register Complaint</button>
+      ${isAdmin ? `<button onclick="showAddCategoryModal()" class="btn-primary"><i class="fas fa-plus"></i>Add Type</button>` : ''}
     </div>
 
-    <!-- Category overview cards -->
-    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;">
-      ${categories.map(cat => {
-        const subs = subByCat[cat.id] || []
-        const c = catColorMap[cat.name] || catColorMap.Miscellaneous
-        const icon = catIcons[cat.name] || 'fa-exclamation-circle'
-        return `<div style="background:${c.bg};border:1.5px solid ${c.border};border-radius:12px;padding:14px;text-align:center;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
-          <div style="width:36px;height:36px;border-radius:10px;background:white;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;box-shadow:0 1px 6px rgba(0,0,0,0.08);">
-            <i class="fas ${icon}" style="color:${c.icon};font-size:15px;"></i>
-          </div>
-          <div style="font-weight:700;font-size:12.5px;color:#111827;">${cat.name}</div>
-          <div style="margin-top:5px;padding:2px 8px;background:${c.badge};color:${c.badgeText};border-radius:20px;font-size:10.5px;font-weight:700;display:inline-block;">${subs.length} sub-types</div>
-        </div>`
-      }).join('')}
-    </div>
-
-    <!-- Detailed category cards -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-      ${categories.map(cat => {
-        const subs = subByCat[cat.id] || []
-        const c = catColorMap[cat.name] || catColorMap.Miscellaneous
-        const icon = catIcons[cat.name] || 'fa-exclamation-circle'
-        return `<div class="card">
-          <div style="background:${c.bg};border-bottom:1px solid ${c.border};padding:14px 18px;border-radius:14px 14px 0 0;display:flex;align-items:center;gap:10px;">
-            <div style="width:34px;height:34px;border-radius:9px;background:white;display:flex;align-items:center;justify-content:center;">
-              <i class="fas ${icon}" style="color:${c.icon};"></i>
-            </div>
-            <div>
-              <div style="font-weight:700;color:#111827;font-size:14px;">${cat.name}</div>
-              <div style="font-size:11px;color:#6B7280;">${subs.length} sub-type(s)</div>
-            </div>
-          </div>
-          <div style="padding:12px 18px;">
-            ${subs.length === 0 ? `<p style="color:#9CA3AF;font-size:12.5px;text-align:center;padding:12px;">No sub-types configured</p>` :
-              subs.map((sc,i) => `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-radius:8px;background:${i%2===0?c.bg:'transparent'};margin-bottom:3px;">
-                <div style="display:flex;align-items:center;gap:8px;">
-                  <span style="width:20px;height:20px;background:${c.badge};color:${c.badgeText};border-radius:50%;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${i+1}</span>
-                  <span style="font-size:12.5px;color:#374151;font-weight:500;">${sc.name}</span>
-                </div>
-                <span style="font-size:10.5px;color:#10B981;font-weight:600;"><i class="fas fa-check-circle" style="margin-right:3px;"></i>Active</span>
-              </div>`).join('')}
-          </div>
-        </div>`
-      }).join('')}
-    </div>
-
-    <!-- How-to guide -->
-    <div class="card" style="padding:18px 22px;border-left:4px solid #E8431A;">
-      <div style="font-weight:700;color:#111827;margin-bottom:10px;font-size:13.5px;"><i class="fas fa-info-circle" style="color:#E8431A;margin-right:8px;"></i>How to Register a Complaint</div>
-      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;">
-        ${[['1','fa-layer-group','Select Type','Choose the main complaint category'],['2','fa-list','Sub-Type','Pick a specific sub-type'],['3','fa-align-left','Describe','Add detailed description'],['4','fa-image','Photo','Optionally attach a photo'],['5','fa-flag','Priority','Set urgency level']].map(([num,ic,lbl,desc])=>`
-        <div style="text-align:center;padding:12px 8px;background:#FFF5F3;border-radius:10px;">
-          <div style="width:28px;height:28px;background:linear-gradient(135deg,#E8431A,#8B1A1A);border-radius:50%;color:white;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;margin:0 auto 6px;">${num}</div>
-          <i class="fas ${ic}" style="color:#E8431A;font-size:14px;margin-bottom:5px;display:block;"></i>
-          <div style="font-weight:700;font-size:11.5px;color:#111827;">${lbl}</div>
-          <div style="font-size:10.5px;color:#9CA3AF;margin-top:2px;">${desc}</div>
-        </div>`).join('')}
+    <!-- Summary Stats -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+      <div class="card" style="padding:16px;display:flex;align-items:center;gap:12px;">
+        <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#E8431A,#8B1A1A);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i class="fas fa-layer-group" style="color:white;font-size:16px;"></i>
+        </div>
+        <div>
+          <div style="font-size:22px;font-weight:800;color:#111827;">${categories.length}</div>
+          <div style="font-size:11px;color:#6B7280;font-weight:500;">Total Types</div>
+        </div>
+      </div>
+      <div class="card" style="padding:16px;display:flex;align-items:center;gap:12px;">
+        <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#10B981,#065F46);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i class="fas fa-check-circle" style="color:white;font-size:16px;"></i>
+        </div>
+        <div>
+          <div style="font-size:22px;font-weight:800;color:#111827;">${totalActive}</div>
+          <div style="font-size:11px;color:#6B7280;font-weight:500;">Active Types</div>
+        </div>
+      </div>
+      <div class="card" style="padding:16px;display:flex;align-items:center;gap:12px;">
+        <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#3B82F6,#1E40AF);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i class="fas fa-list" style="color:white;font-size:16px;"></i>
+        </div>
+        <div>
+          <div style="font-size:22px;font-weight:800;color:#111827;">${totalSubs}</div>
+          <div style="font-size:11px;color:#6B7280;font-weight:500;">Total Sub-Types</div>
+        </div>
+      </div>
+      <div class="card" style="padding:16px;display:flex;align-items:center;gap:12px;">
+        <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#8B5CF6,#4C1D95);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i class="fas fa-toggle-on" style="color:white;font-size:16px;"></i>
+        </div>
+        <div>
+          <div style="font-size:22px;font-weight:800;color:#111827;">${activeSubs}</div>
+          <div style="font-size:11px;color:#6B7280;font-weight:500;">Active Sub-Types</div>
+        </div>
       </div>
     </div>
+
+    <!-- Category Cards Grid -->
+    <div style="display:flex;flex-direction:column;gap:16px;">
+      ${categories.length === 0 ? `
+        <div class="card" style="padding:40px;text-align:center;color:#9CA3AF;">
+          <i class="fas fa-layer-group" style="font-size:48px;margin-bottom:16px;opacity:0.3;display:block;"></i>
+          <div style="font-size:16px;font-weight:600;margin-bottom:8px;">No complaint types configured</div>
+          ${isAdmin ? `<button onclick="showAddCategoryModal()" class="btn-primary" style="margin-top:12px;"><i class="fas fa-plus"></i>Add First Type</button>` : ''}
+        </div>
+      ` : categories.map((cat, catIdx) => {
+        const subs = subByCat[cat.id] || []
+        const activeSubs2 = subs.filter(s => s.is_active)
+        const inactiveSubs = subs.filter(s => !s.is_active)
+        const c = getCatColor(catIdx)
+        const icon = cat.icon || 'fa-exclamation-circle'
+        const isInactive = !cat.is_active
+        return `
+        <div class="card" style="overflow:hidden;${isInactive?'opacity:0.65;':''}" id="cat-card-${cat.id}">
+          <!-- Category Header -->
+          <div style="background:${c.bg};border-bottom:1.5px solid ${c.border};padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+            <div style="display:flex;align-items:center;gap:12px;flex:1;">
+              <div style="width:42px;height:42px;border-radius:11px;background:white;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.1);flex-shrink:0;">
+                <i class="fas ${icon}" style="color:${c.icon};font-size:18px;"></i>
+              </div>
+              <div>
+                <div style="font-weight:700;color:#111827;font-size:15px;display:flex;align-items:center;gap:8px;">
+                  ${cat.name}
+                  ${isInactive ? `<span style="background:#FEE2E2;color:#B91C1C;font-size:9.5px;padding:2px 7px;border-radius:20px;font-weight:700;">INACTIVE</span>` : ''}
+                </div>
+                <div style="font-size:11.5px;color:#6B7280;margin-top:2px;">
+                  ${cat.description || 'No description'}
+                  &bull; <strong>${subs.length}</strong> sub-type(s) &bull; Sort: ${cat.sort_order||1}
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+              <span style="background:${c.badge};color:${c.badgeText};padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;">${activeSubs2.length} active</span>
+              ${isAdmin ? `
+              <button onclick="showAddSubCategoryModal(${cat.id},'${cat.name.replace(/'/g,'\\\'')}')" 
+                style="background:${c.accent};color:white;border:none;border-radius:8px;padding:6px 12px;font-size:11.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;">
+                <i class="fas fa-plus"></i>Add Sub-Type
+              </button>
+              <button onclick="showEditCategoryModal(${cat.id})" 
+                style="background:white;border:1.5px solid ${c.border};border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;color:${c.icon};" title="Edit type">
+                <i class="fas fa-edit"></i>
+              </button>
+              <button onclick="confirmDeleteCategory(${cat.id},'${cat.name.replace(/'/g,'\\\'')}')" 
+                style="background:white;border:1.5px solid #FECACA;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;color:#DC2626;" title="Delete type">
+                <i class="fas fa-trash"></i>
+              </button>
+              ` : ''}
+            </div>
+          </div>
+
+          <!-- Sub-types Table -->
+          <div style="padding:0;">
+            ${subs.length === 0 ? `
+              <div style="padding:20px;text-align:center;color:#9CA3AF;font-size:12.5px;">
+                <i class="fas fa-inbox" style="font-size:24px;margin-bottom:8px;display:block;opacity:0.4;"></i>
+                No sub-types yet ${isAdmin ? `— <button onclick="showAddSubCategoryModal(${cat.id},'${cat.name.replace(/'/g,'\\\'')}')" style="color:${c.icon};background:none;border:none;font-weight:600;cursor:pointer;font-size:12.5px;">Add one</button>` : ''}
+              </div>
+            ` : `
+              <table style="width:100%;border-collapse:collapse;">
+                <thead>
+                  <tr style="background:#F9FAFB;border-bottom:1px solid #F3F4F6;">
+                    <th style="padding:10px 20px;text-align:left;font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.05em;width:40px;">#</th>
+                    <th style="padding:10px 16px;text-align:left;font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.05em;">Sub-Type Name</th>
+                    <th style="padding:10px 16px;text-align:left;font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.05em;">Description</th>
+                    <th style="padding:10px 16px;text-align:center;font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.05em;">Res. Days</th>
+                    <th style="padding:10px 16px;text-align:center;font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.05em;">Status</th>
+                    <th style="padding:10px 16px;text-align:center;font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.05em;">Sort</th>
+                    ${isAdmin ? `<th style="padding:10px 16px;text-align:center;font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.05em;">Actions</th>` : ''}
+                  </tr>
+                </thead>
+                <tbody>
+                  ${subs.map((sc, i) => `
+                    <tr style="border-bottom:1px solid #F3F4F6;${!sc.is_active?'opacity:0.55;background:#FAFAFA;':''}transition:background 0.15s;" 
+                        onmouseover="this.style.background='${c.bg}'" onmouseout="this.style.background=''">
+                      <td style="padding:11px 20px;">
+                        <span style="width:22px;height:22px;background:${c.badge};color:${c.badgeText};border-radius:50%;font-size:10px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;">${i+1}</span>
+                      </td>
+                      <td style="padding:11px 16px;">
+                        <div style="font-weight:600;color:#111827;font-size:13px;">${sc.name}</div>
+                      </td>
+                      <td style="padding:11px 16px;color:#6B7280;font-size:12px;max-width:240px;">
+                        ${sc.description ? `<span title="${sc.description}">${sc.description.length>60?sc.description.substring(0,60)+'…':sc.description}</span>` : '<span style="color:#D1D5DB;">—</span>'}
+                      </td>
+                      <td style="padding:11px 16px;text-align:center;">
+                        ${sc.typical_resolution_days ? `<span style="background:#F0FDF4;color:#16A34A;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;">${sc.typical_resolution_days}d</span>` : '<span style="color:#D1D5DB;font-size:12px;">—</span>'}
+                      </td>
+                      <td style="padding:11px 16px;text-align:center;">
+                        <span style="background:${sc.is_active?'#D1FAE5':'#FEE2E2'};color:${sc.is_active?'#065F46':'#B91C1C'};padding:3px 10px;border-radius:20px;font-size:10.5px;font-weight:700;">
+                          ${sc.is_active?'Active':'Inactive'}
+                        </span>
+                      </td>
+                      <td style="padding:11px 16px;text-align:center;color:#9CA3AF;font-size:12px;">${sc.sort_order||1}</td>
+                      ${isAdmin ? `
+                      <td style="padding:11px 16px;text-align:center;">
+                        <div style="display:flex;gap:6px;justify-content:center;">
+                          <button onclick="showEditSubCategoryModal(${sc.id},${cat.id})" 
+                            style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:7px;padding:5px 9px;font-size:11.5px;cursor:pointer;color:#2563EB;" title="Edit">
+                            <i class="fas fa-edit"></i>
+                          </button>
+                          <button onclick="confirmDeleteSubCategory(${sc.id},'${sc.name.replace(/'/g,'\\\'')}')" 
+                            style="background:#FEF2F2;border:1px solid #FECACA;border-radius:7px;padding:5px 9px;font-size:11.5px;cursor:pointer;color:#DC2626;" title="Delete">
+                            <i class="fas fa-trash"></i>
+                          </button>
+                        </div>
+                      </td>` : ''}
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            `}
+          </div>
+        </div>`
+      }).join('')}
+    </div>
   </div>`
+}
+
+// ── Add Category Modal ────────────────────────────────────────
+function showAddCategoryModal() {
+  const iconOpts = CAT_ICON_OPTIONS.map(ic =>
+    `<option value="${ic}">${ic.replace('fa-','')}</option>`
+  ).join('')
+  showModal(`
+    <div style="padding:0;">
+      <div style="background:linear-gradient(135deg,#E8431A,#8B1A1A);padding:20px 24px;border-radius:14px 14px 0 0;display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:36px;height:36px;background:rgba(255,255,255,0.15);border-radius:9px;display:flex;align-items:center;justify-content:center;">
+            <i class="fas fa-plus" style="color:white;font-size:16px;"></i>
+          </div>
+          <div style="color:white;">
+            <div style="font-weight:700;font-size:15px;">Add Complaint Type</div>
+            <div style="font-size:11px;opacity:0.85;">Create a new complaint category</div>
+          </div>
+        </div>
+        <button onclick="closeModal()" style="background:rgba(255,255,255,0.15);border:none;border-radius:8px;padding:6px 10px;cursor:pointer;color:white;font-size:14px;"><i class="fas fa-times"></i></button>
+      </div>
+      <div style="padding:22px 24px;display:flex;flex-direction:column;gap:14px;">
+        <div>
+          <label class="form-label">Type Name *</label>
+          <input id="catName" class="form-input" placeholder="e.g. Plumbing, Electrical…" />
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div>
+            <label class="form-label">Icon</label>
+            <select id="catIcon" class="form-input">${iconOpts}</select>
+          </div>
+          <div>
+            <label class="form-label">Sort Order</label>
+            <input id="catSort" type="number" class="form-input" value="1" min="1" />
+          </div>
+        </div>
+        <div>
+          <label class="form-label">Description</label>
+          <textarea id="catDesc" class="form-input" rows="2" placeholder="Brief description of this complaint type…"></textarea>
+        </div>
+        <div style="display:flex;gap:10px;padding-top:4px;">
+          <button onclick="submitAddCategory()" class="btn-primary" style="flex:1;padding:10px;">
+            <i class="fas fa-check" style="margin-right:6px;"></i>Create Type
+          </button>
+          <button onclick="closeModal()" style="flex:0 0 auto;padding:10px 20px;border:1.5px solid #E5E7EB;border-radius:10px;background:white;color:#6B7280;cursor:pointer;font-weight:600;">Cancel</button>
+        </div>
+      </div>
+    </div>
+  `)
+}
+
+async function submitAddCategory() {
+  const name = document.getElementById('catName').value.trim()
+  const icon = document.getElementById('catIcon').value
+  const sort_order = parseInt(document.getElementById('catSort').value)||1
+  const description = document.getElementById('catDesc').value.trim()
+  if (!name) { toast('Type name is required','error'); return }
+  const r = await api('POST', '/complaints/categories', { name, icon, description, sort_order })
+  if (r?.ok) { toast('Complaint type created!','success'); closeModal(); loadComplaintsMaster() }
+  else toast(r?.data?.error||'Failed to create type','error')
+}
+
+// ── Edit Category Modal ───────────────────────────────────────
+async function showEditCategoryModal(id) {
+  // Fetch all categories to find this one
+  const r = await api('GET', '/complaints/categories/all')
+  const cat = (r?.data?.categories||[]).find(c => c.id == id)
+  if (!cat) { toast('Category not found','error'); return }
+  const iconOpts = CAT_ICON_OPTIONS.map(ic =>
+    `<option value="${ic}" ${cat.icon===ic?'selected':''}>${ic.replace('fa-','')}</option>`
+  ).join('')
+  showModal(`
+    <div style="padding:0;">
+      <div style="background:linear-gradient(135deg,#2563EB,#1E40AF);padding:20px 24px;border-radius:14px 14px 0 0;display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:36px;height:36px;background:rgba(255,255,255,0.15);border-radius:9px;display:flex;align-items:center;justify-content:center;">
+            <i class="fas fa-edit" style="color:white;font-size:16px;"></i>
+          </div>
+          <div style="color:white;">
+            <div style="font-weight:700;font-size:15px;">Edit Complaint Type</div>
+            <div style="font-size:11px;opacity:0.85;">${cat.name}</div>
+          </div>
+        </div>
+        <button onclick="closeModal()" style="background:rgba(255,255,255,0.15);border:none;border-radius:8px;padding:6px 10px;cursor:pointer;color:white;font-size:14px;"><i class="fas fa-times"></i></button>
+      </div>
+      <div style="padding:22px 24px;display:flex;flex-direction:column;gap:14px;">
+        <div>
+          <label class="form-label">Type Name *</label>
+          <input id="editCatName" class="form-input" value="${cat.name}" />
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+          <div>
+            <label class="form-label">Icon</label>
+            <select id="editCatIcon" class="form-input">${iconOpts}</select>
+          </div>
+          <div>
+            <label class="form-label">Sort Order</label>
+            <input id="editCatSort" type="number" class="form-input" value="${cat.sort_order||1}" min="1" />
+          </div>
+          <div>
+            <label class="form-label">Status</label>
+            <select id="editCatStatus" class="form-input">
+              <option value="1" ${cat.is_active?'selected':''}>Active</option>
+              <option value="0" ${!cat.is_active?'selected':''}>Inactive</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="form-label">Description</label>
+          <textarea id="editCatDesc" class="form-input" rows="2">${cat.description||''}</textarea>
+        </div>
+        <div style="display:flex;gap:10px;padding-top:4px;">
+          <button onclick="submitEditCategory(${id})" class="btn-primary" style="flex:1;padding:10px;">
+            <i class="fas fa-save" style="margin-right:6px;"></i>Save Changes
+          </button>
+          <button onclick="closeModal()" style="flex:0 0 auto;padding:10px 20px;border:1.5px solid #E5E7EB;border-radius:10px;background:white;color:#6B7280;cursor:pointer;font-weight:600;">Cancel</button>
+        </div>
+      </div>
+    </div>
+  `)
+}
+
+async function submitEditCategory(id) {
+  const name = document.getElementById('editCatName').value.trim()
+  const icon = document.getElementById('editCatIcon').value
+  const sort_order = parseInt(document.getElementById('editCatSort').value)||1
+  const description = document.getElementById('editCatDesc').value.trim()
+  const is_active = document.getElementById('editCatStatus').value === '1'
+  if (!name) { toast('Type name is required','error'); return }
+  const r = await api('PUT', `/complaints/categories/${id}`, { name, icon, description, sort_order, is_active })
+  if (r?.ok) { toast('Type updated!','success'); closeModal(); loadComplaintsMaster() }
+  else toast(r?.data?.error||'Failed to update','error')
+}
+
+async function confirmDeleteCategory(id, name) {
+  if (!confirm(`Delete complaint type "${name}"?\n\nThis will also remove all its sub-types. This cannot be undone.`)) return
+  const r = await api('DELETE', `/complaints/categories/${id}`, null)
+  if (r?.ok) { toast('Type deleted','success'); loadComplaintsMaster() }
+  else toast(r?.data?.error||'Failed to delete','error')
+}
+
+// ── Add Sub-Category Modal ────────────────────────────────────
+function showAddSubCategoryModal(catId, catName) {
+  showModal(`
+    <div style="padding:0;">
+      <div style="background:linear-gradient(135deg,#10B981,#065F46);padding:20px 24px;border-radius:14px 14px 0 0;display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:36px;height:36px;background:rgba(255,255,255,0.15);border-radius:9px;display:flex;align-items:center;justify-content:center;">
+            <i class="fas fa-plus" style="color:white;font-size:16px;"></i>
+          </div>
+          <div style="color:white;">
+            <div style="font-weight:700;font-size:15px;">Add Sub-Type</div>
+            <div style="font-size:11px;opacity:0.85;">Under: ${catName}</div>
+          </div>
+        </div>
+        <button onclick="closeModal()" style="background:rgba(255,255,255,0.15);border:none;border-radius:8px;padding:6px 10px;cursor:pointer;color:white;font-size:14px;"><i class="fas fa-times"></i></button>
+      </div>
+      <div style="padding:22px 24px;display:flex;flex-direction:column;gap:14px;">
+        <input type="hidden" id="subCatParentId" value="${catId}" />
+        <div>
+          <label class="form-label">Sub-Type Name *</label>
+          <input id="subCatName" class="form-input" placeholder="e.g. Pipe Leakage, Socket Repair…" />
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div>
+            <label class="form-label">Typical Resolution (days)</label>
+            <input id="subCatDays" type="number" class="form-input" placeholder="e.g. 3" min="1" />
+          </div>
+          <div>
+            <label class="form-label">Sort Order</label>
+            <input id="subCatSort" type="number" class="form-input" value="1" min="1" />
+          </div>
+        </div>
+        <div>
+          <label class="form-label">Description</label>
+          <textarea id="subCatDesc" class="form-input" rows="2" placeholder="Detailed description of this sub-type…"></textarea>
+        </div>
+        <div style="display:flex;gap:10px;padding-top:4px;">
+          <button onclick="submitAddSubCategory()" class="btn-primary" style="flex:1;padding:10px;">
+            <i class="fas fa-check" style="margin-right:6px;"></i>Create Sub-Type
+          </button>
+          <button onclick="closeModal()" style="flex:0 0 auto;padding:10px 20px;border:1.5px solid #E5E7EB;border-radius:10px;background:white;color:#6B7280;cursor:pointer;font-weight:600;">Cancel</button>
+        </div>
+      </div>
+    </div>
+  `)
+}
+
+async function submitAddSubCategory() {
+  const category_id = document.getElementById('subCatParentId').value
+  const name = document.getElementById('subCatName').value.trim()
+  const description = document.getElementById('subCatDesc').value.trim()
+  const typical_resolution_days = parseInt(document.getElementById('subCatDays').value)||null
+  const sort_order = parseInt(document.getElementById('subCatSort').value)||1
+  if (!name) { toast('Sub-type name is required','error'); return }
+  const r = await api('POST', '/complaints/sub-categories', { category_id: parseInt(category_id), name, description, typical_resolution_days, sort_order })
+  if (r?.ok) { toast('Sub-type created!','success'); closeModal(); loadComplaintsMaster() }
+  else toast(r?.data?.error||'Failed to create sub-type','error')
+}
+
+// ── Edit Sub-Category Modal ───────────────────────────────────
+async function showEditSubCategoryModal(id, catId) {
+  // Fetch sub-categories for this category
+  const [allSubR, catR] = await Promise.all([
+    api('GET', `/complaints/sub-categories/all?category_id=${catId}`),
+    api('GET', '/complaints/categories/all')
+  ])
+  const sc = (allSubR?.data?.sub_categories||[]).find(s => s.id == id)
+  const categories = catR?.data?.categories || []
+  if (!sc) { toast('Sub-category not found','error'); return }
+  const catOpts = categories.map(c =>
+    `<option value="${c.id}" ${c.id==sc.category_id?'selected':''}>${c.name}</option>`
+  ).join('')
+  showModal(`
+    <div style="padding:0;">
+      <div style="background:linear-gradient(135deg,#2563EB,#1E40AF);padding:20px 24px;border-radius:14px 14px 0 0;display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:36px;height:36px;background:rgba(255,255,255,0.15);border-radius:9px;display:flex;align-items:center;justify-content:center;">
+            <i class="fas fa-edit" style="color:white;font-size:16px;"></i>
+          </div>
+          <div style="color:white;">
+            <div style="font-weight:700;font-size:15px;">Edit Sub-Type</div>
+            <div style="font-size:11px;opacity:0.85;">${sc.name}</div>
+          </div>
+        </div>
+        <button onclick="closeModal()" style="background:rgba(255,255,255,0.15);border:none;border-radius:8px;padding:6px 10px;cursor:pointer;color:white;font-size:14px;"><i class="fas fa-times"></i></button>
+      </div>
+      <div style="padding:22px 24px;display:flex;flex-direction:column;gap:14px;">
+        <div>
+          <label class="form-label">Sub-Type Name *</label>
+          <input id="editSubName" class="form-input" value="${sc.name}" />
+        </div>
+        <div>
+          <label class="form-label">Parent Type</label>
+          <select id="editSubCatId" class="form-input">${catOpts}</select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+          <div>
+            <label class="form-label">Res. Days</label>
+            <input id="editSubDays" type="number" class="form-input" value="${sc.typical_resolution_days||''}" min="1" placeholder="e.g. 3" />
+          </div>
+          <div>
+            <label class="form-label">Sort Order</label>
+            <input id="editSubSort" type="number" class="form-input" value="${sc.sort_order||1}" min="1" />
+          </div>
+          <div>
+            <label class="form-label">Status</label>
+            <select id="editSubStatus" class="form-input">
+              <option value="1" ${sc.is_active?'selected':''}>Active</option>
+              <option value="0" ${!sc.is_active?'selected':''}>Inactive</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="form-label">Description</label>
+          <textarea id="editSubDesc" class="form-input" rows="2">${sc.description||''}</textarea>
+        </div>
+        <div style="display:flex;gap:10px;padding-top:4px;">
+          <button onclick="submitEditSubCategory(${id})" class="btn-primary" style="flex:1;padding:10px;">
+            <i class="fas fa-save" style="margin-right:6px;"></i>Save Changes
+          </button>
+          <button onclick="closeModal()" style="flex:0 0 auto;padding:10px 20px;border:1.5px solid #E5E7EB;border-radius:10px;background:white;color:#6B7280;cursor:pointer;font-weight:600;">Cancel</button>
+        </div>
+      </div>
+    </div>
+  `)
+}
+
+async function submitEditSubCategory(id) {
+  const name = document.getElementById('editSubName').value.trim()
+  const category_id = parseInt(document.getElementById('editSubCatId').value)
+  const description = document.getElementById('editSubDesc').value.trim()
+  const typical_resolution_days = parseInt(document.getElementById('editSubDays').value)||null
+  const sort_order = parseInt(document.getElementById('editSubSort').value)||1
+  const is_active = document.getElementById('editSubStatus').value === '1'
+  if (!name) { toast('Sub-type name is required','error'); return }
+  const r = await api('PUT', `/complaints/sub-categories/${id}`, { name, category_id, description, typical_resolution_days, sort_order, is_active })
+  if (r?.ok) { toast('Sub-type updated!','success'); closeModal(); loadComplaintsMaster() }
+  else toast(r?.data?.error||'Failed to update','error')
+}
+
+async function confirmDeleteSubCategory(id, name) {
+  if (!confirm(`Delete sub-type "${name}"?\n\nThis cannot be undone.`)) return
+  const r = await api('DELETE', `/complaints/sub-categories/${id}`, null)
+  if (r?.ok) { toast('Sub-type deleted','success'); loadComplaintsMaster() }
+  else toast(r?.data?.error||'Failed to delete','error')
+}
+
+// ══════════════════════════════════════════════════════════════
+// ── INTERNAL COMPLAINTS ──────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+
+const IC_CATEGORIES = [
+  'HR / People Issues', 'Facilities & Maintenance', 'IT & Systems',
+  'Safety & Compliance', 'Management Concern', 'Process Improvement', 'General'
+]
+const IC_PRIORITY_STYLE = {
+  Normal:  { bg:'#F0F9FF', color:'#0369A1', border:'#BAE6FD' },
+  High:    { bg:'#FFF7ED', color:'#C2410C', border:'#FDC99B' },
+  Urgent:  { bg:'#FEF2F2', color:'#B91C1C', border:'#FECACA' },
+  Low:     { bg:'#F9FAFB', color:'#6B7280', border:'#E5E7EB' },
+}
+const IC_STATUS_STYLE = {
+  'Pending':     { bg:'#FFFBEB', color:'#D97706', border:'#FDE68A', icon:'fa-clock' },
+  'In-Progress': { bg:'#EFF6FF', color:'#1D4ED8', border:'#BFDBFE', icon:'fa-spinner' },
+  'Resolved':    { bg:'#F0FDF4', color:'#15803D', border:'#86EFAC', icon:'fa-check-circle' },
+}
+
+function icStatusBadge(status) {
+  const s = IC_STATUS_STYLE[status] || IC_STATUS_STYLE['Pending']
+  return `<span style="background:${s.bg};color:${s.color};border:1px solid ${s.border};padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:5px;">
+    <i class="fas ${s.icon}" style="font-size:10px;"></i>${status}
+  </span>`
+}
+function icPriorityBadge(p) {
+  const s = IC_PRIORITY_STYLE[p] || IC_PRIORITY_STYLE['Normal']
+  return `<span style="background:${s.bg};color:${s.color};border:1px solid ${s.border};padding:2px 9px;border-radius:20px;font-size:10.5px;font-weight:700;">${p}</span>`
+}
+
+async function loadInternalComplaints(params = {}) {
+  const content = document.getElementById('pageContent')
+  content.innerHTML = `<div class="loading"><div class="spinner"></div></div>`
+
+  const isManager = ['admin','sub_admin'].includes(currentUser?.role)
+  const statusFilter = params?.status || ''
+
+  const r = await api('GET', `/internal-complaints?limit=50&status=${statusFilter}`)
+  const complaints = r?.data?.complaints || []
+  const total = r?.data?.total || 0
+
+  const pending    = complaints.filter(c => c.status === 'Pending').length
+  const inProgress = complaints.filter(c => c.status === 'In-Progress').length
+  const resolved   = complaints.filter(c => c.status === 'Resolved').length
+
+  content.innerHTML = `
+  <div style="display:flex;flex-direction:column;gap:18px;">
+
+    <!-- Header -->
+    <div class="page-header">
+      <div class="page-title">
+        <div class="page-title-icon" style="background:linear-gradient(135deg,#7C3AED,#4C1D95);"><i class="fas fa-comment-dots"></i></div>
+        <div>
+          <div>Internal Complaints</div>
+          <div class="page-subtitle">Employee-side issue tracker &bull; ${total} total</div>
+        </div>
+      </div>
+      <button onclick="showRegisterInternalComplaint()" class="btn-primary" style="background:linear-gradient(135deg,#7C3AED,#4C1D95);box-shadow:0 3px 14px rgba(124,58,237,0.35);">
+        <i class="fas fa-plus"></i>Raise Complaint
+      </button>
+    </div>
+
+    <!-- Stats -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+      ${[
+        [total,   'Total',      'fa-layer-group',  'linear-gradient(135deg,#7C3AED,#4C1D95)', 'all'],
+        [pending, 'Pending',    'fa-clock',        'linear-gradient(135deg,#D97706,#92400E)', 'Pending'],
+        [inProgress,'In-Progress','fa-spinner',    'linear-gradient(135deg,#1D4ED8,#1E3A8A)', 'In-Progress'],
+        [resolved,'Resolved',   'fa-check-circle', 'linear-gradient(135deg,#15803D,#14532D)', 'Resolved'],
+      ].map(([val,lbl,ic,grad,sf]) => `
+      <div class="card" style="padding:16px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:transform .15s;"
+           onclick="loadInternalComplaints({status:'${sf==='all'?'':sf}'})"
+           onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
+        <div style="width:40px;height:40px;border-radius:10px;background:${grad};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i class="fas ${ic}" style="color:white;font-size:16px;"></i>
+        </div>
+        <div>
+          <div style="font-size:22px;font-weight:800;color:#111827;">${val}</div>
+          <div style="font-size:11px;color:#6B7280;font-weight:500;">${lbl}</div>
+        </div>
+      </div>`).join('')}
+    </div>
+
+    <!-- Filter tabs -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      ${['','Pending','In-Progress','Resolved'].map(sf => `
+      <button onclick="loadInternalComplaints({status:'${sf}'})"
+        style="padding:7px 16px;border-radius:20px;border:1.5px solid ${sf===statusFilter?'#7C3AED':'#E5E7EB'};background:${sf===statusFilter?'#7C3AED':'white'};color:${sf===statusFilter?'white':'#6B7280'};font-weight:600;font-size:12px;cursor:pointer;transition:all .15s;">
+        ${sf || 'All'}
+      </button>`).join('')}
+    </div>
+
+    <!-- Table -->
+    ${complaints.length === 0 ? `
+    <div class="card" style="padding:48px;text-align:center;color:#9CA3AF;">
+      <i class="fas fa-comment-slash" style="font-size:48px;margin-bottom:16px;display:block;opacity:0.3;"></i>
+      <div style="font-size:16px;font-weight:600;margin-bottom:8px;">No internal complaints</div>
+      <div style="font-size:13px;margin-bottom:16px;">Raise one to get started</div>
+      <button onclick="showRegisterInternalComplaint()" style="background:linear-gradient(135deg,#7C3AED,#4C1D95);color:white;border:none;border-radius:10px;padding:10px 24px;font-weight:700;cursor:pointer;">
+        <i class="fas fa-plus" style="margin-right:6px;"></i>Raise Complaint
+      </button>
+    </div>` : `
+    <div class="card" style="overflow:hidden;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr style="background:#F9FAFB;border-bottom:1px solid #F3F4F6;">
+            <th style="padding:11px 18px;text-align:left;font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;">Ref No.</th>
+            <th style="padding:11px 16px;text-align:left;font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;">Category</th>
+            <th style="padding:11px 16px;text-align:left;font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;">Description</th>
+            ${isManager ? `<th style="padding:11px 16px;text-align:left;font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;">Reported By</th>` : ''}
+            <th style="padding:11px 16px;text-align:center;font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;">Priority</th>
+            <th style="padding:11px 16px;text-align:center;font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;">Status</th>
+            <th style="padding:11px 16px;text-align:left;font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;">Date</th>
+            <th style="padding:11px 16px;text-align:center;font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${complaints.map((c, i) => `
+          <tr style="border-bottom:1px solid #F9FAFB;transition:background .15s;" onmouseover="this.style.background='#F9F7FF'" onmouseout="this.style.background=''">
+            <td style="padding:12px 18px;">
+              <div style="font-weight:700;font-size:12.5px;color:#7C3AED;font-family:monospace;">${c.complaint_no}</div>
+              ${c.assigned_to_name ? `<div style="font-size:10.5px;color:#9CA3AF;margin-top:2px;"><i class="fas fa-user-check" style="margin-right:3px;"></i>${c.assigned_to_name}</div>` : ''}
+            </td>
+            <td style="padding:12px 16px;">
+              <div style="font-weight:600;font-size:12.5px;color:#111827;">${c.category}</div>
+              ${c.sub_category ? `<div style="font-size:11px;color:#9CA3AF;">${c.sub_category}</div>` : ''}
+            </td>
+            <td style="padding:12px 16px;max-width:220px;">
+              <div style="font-size:12.5px;color:#374151;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${c.description}">${c.description}</div>
+            </td>
+            ${isManager ? `<td style="padding:12px 16px;font-size:12px;color:#374151;">${c.reporter_name}<br/><span style="color:#9CA3AF;font-size:10.5px;">${c.reporter_dept||''}</span></td>` : ''}
+            <td style="padding:12px 16px;text-align:center;">${icPriorityBadge(c.priority)}</td>
+            <td style="padding:12px 16px;text-align:center;">${icStatusBadge(c.status)}</td>
+            <td style="padding:12px 16px;font-size:11.5px;color:#6B7280;white-space:nowrap;">${formatDate(c.created_at)}</td>
+            <td style="padding:12px 16px;text-align:center;">
+              <button onclick="showInternalComplaintDetail(${c.id})"
+                style="background:#F5F3FF;border:1px solid #DDD6FE;color:#7C3AED;border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer;font-weight:600;">
+                <i class="fas fa-eye"></i>
+              </button>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`}
+  </div>`
+}
+
+async function showRegisterInternalComplaint() {
+  const catOpts = IC_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')
+  showModal(`
+    <div style="padding:0;">
+      <div style="background:linear-gradient(135deg,#7C3AED,#4C1D95);padding:20px 24px;border-radius:14px 14px 0 0;display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:36px;height:36px;background:rgba(255,255,255,0.15);border-radius:9px;display:flex;align-items:center;justify-content:center;">
+            <i class="fas fa-comment-dots" style="color:white;font-size:16px;"></i>
+          </div>
+          <div style="color:white;">
+            <div style="font-weight:700;font-size:15px;">Raise Internal Complaint</div>
+            <div style="font-size:11px;opacity:.85;">Only visible to authorized staff</div>
+          </div>
+        </div>
+        <button onclick="closeModal()" style="background:rgba(255,255,255,0.15);border:none;border-radius:8px;padding:6px 10px;cursor:pointer;color:white;font-size:14px;"><i class="fas fa-times"></i></button>
+      </div>
+      <div style="padding:22px 24px;display:flex;flex-direction:column;gap:14px;max-height:70vh;overflow-y:auto;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div>
+            <label class="form-label">Category *</label>
+            <select id="icCat" class="form-input">${catOpts}</select>
+          </div>
+          <div>
+            <label class="form-label">Sub-Category</label>
+            <input id="icSubCat" class="form-input" placeholder="Optional detail…" />
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div>
+            <label class="form-label">Priority</label>
+            <select id="icPriority" class="form-input">
+              <option>Normal</option><option>Low</option><option>High</option><option>Urgent</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Photo (optional)</label>
+            <input type="file" id="icPhoto" accept="image/*" class="form-input" style="padding:6px;"/>
+          </div>
+        </div>
+        <div>
+          <label class="form-label">Description *</label>
+          <textarea id="icDesc" class="form-input" rows="4" placeholder="Describe the issue in detail — include location, impact, steps to reproduce if applicable…"></textarea>
+        </div>
+        <div style="display:flex;gap:10px;padding-top:4px;">
+          <button onclick="submitInternalComplaint()" style="flex:1;padding:11px;background:linear-gradient(135deg,#7C3AED,#4C1D95);color:white;border:none;border-radius:10px;font-weight:700;font-size:13.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+            <i class="fas fa-paper-plane"></i>Submit Complaint
+          </button>
+          <button onclick="closeModal()" style="flex:0 0 auto;padding:11px 20px;border:1.5px solid #E5E7EB;border-radius:10px;background:white;color:#6B7280;cursor:pointer;font-weight:600;">Cancel</button>
+        </div>
+      </div>
+    </div>
+  `)
+}
+
+async function submitInternalComplaint() {
+  const category    = document.getElementById('icCat').value
+  const sub_category= document.getElementById('icSubCat').value.trim()
+  const priority    = document.getElementById('icPriority').value
+  const description = document.getElementById('icDesc').value.trim()
+  const photoFile   = document.getElementById('icPhoto').files[0]
+  if (!description) { toast('Description is required', 'error'); return }
+  let photo_data = null
+  if (photoFile) photo_data = await fileToBase64(photoFile)
+  const r = await api('POST', '/internal-complaints', { category, sub_category: sub_category||null, priority, description, photo_data })
+  if (r?.ok) {
+    toast(`Internal complaint ${r.data.complaint_no} raised!`, 'success')
+    closeModal(); loadInternalComplaints()
+  } else toast(r?.data?.error || 'Failed to submit', 'error')
+}
+
+async function showInternalComplaintDetail(id) {
+  const r = await api('GET', `/internal-complaints/${id}`)
+  if (!r?.ok) { toast('Failed to load', 'error'); return }
+  const { complaint: c, audit_trail } = r.data
+  const isManager = ['admin','sub_admin'].includes(currentUser?.role)
+  const isOwner   = c.reported_by_employee_id == currentUser?.id
+  const isAssigned= c.assigned_to_employee_id == currentUser?.id
+  const canAct    = isManager || isAssigned
+
+  // Load employees for assignment dropdown (managers only)
+  let empList = []
+  if (isManager) {
+    const er = await api('GET', '/employees?limit=100')
+    empList = (er?.data?.employees || []).filter(e => e.is_active)
+  }
+
+  const sStyle = IC_STATUS_STYLE[c.status] || IC_STATUS_STYLE['Pending']
+
+  showModal(`
+    <div style="padding:0;">
+      <!-- Header -->
+      <div style="background:linear-gradient(135deg,#7C3AED,#4C1D95);padding:18px 22px;border-radius:14px 14px 0 0;display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:36px;height:36px;background:rgba(255,255,255,0.15);border-radius:9px;display:flex;align-items:center;justify-content:center;">
+            <i class="fas fa-comment-dots" style="color:white;font-size:16px;"></i>
+          </div>
+          <div style="color:white;">
+            <div style="font-weight:700;font-size:15px;font-family:monospace;">${c.complaint_no}</div>
+            <div style="font-size:11px;opacity:.85;">${c.category}${c.sub_category?' · '+c.sub_category:''}</div>
+          </div>
+        </div>
+        <button onclick="closeModal()" style="background:rgba(255,255,255,0.15);border:none;border-radius:8px;padding:6px 10px;cursor:pointer;color:white;font-size:14px;"><i class="fas fa-times"></i></button>
+      </div>
+
+      <div style="padding:20px 22px;max-height:72vh;overflow-y:auto;display:flex;flex-direction:column;gap:16px;">
+
+        <!-- Status + priority row -->
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          ${icStatusBadge(c.status)}
+          ${icPriorityBadge(c.priority)}
+          <span style="font-size:11.5px;color:#9CA3AF;margin-left:auto;">${formatDateTime(c.created_at)}</span>
+        </div>
+
+        <!-- Meta grid -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div style="background:#F9FAFB;border-radius:10px;padding:12px;">
+            <div style="font-size:10.5px;color:#9CA3AF;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Reported By</div>
+            <div style="font-weight:700;font-size:13px;color:#111827;">${c.reporter_name}</div>
+            <div style="font-size:11.5px;color:#6B7280;">${c.reporter_dept||''}</div>
+          </div>
+          <div style="background:#F9FAFB;border-radius:10px;padding:12px;">
+            <div style="font-size:10.5px;color:#9CA3AF;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Assigned To</div>
+            <div style="font-weight:700;font-size:13px;color:#111827;">${c.assigned_to_name || '—'}</div>
+            <div style="font-size:11.5px;color:#6B7280;">${c.assigned_at ? formatDate(c.assigned_at) : ''}</div>
+          </div>
+        </div>
+
+        <!-- Description -->
+        <div style="background:#F9F7FF;border:1px solid #DDD6FE;border-radius:10px;padding:14px;">
+          <div style="font-size:10.5px;color:#7C3AED;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px;">Description</div>
+          <div style="font-size:13px;color:#374151;line-height:1.65;">${c.description}</div>
+        </div>
+
+        <!-- Photo -->
+        ${c.photo_data ? `
+        <div>
+          <div style="font-size:10.5px;color:#9CA3AF;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px;">Attachment</div>
+          <img src="${c.photo_data}" style="max-width:100%;border-radius:10px;border:1px solid #E5E7EB;max-height:200px;object-fit:cover;"/>
+        </div>` : ''}
+
+        <!-- Resolution notes -->
+        ${c.resolution_notes ? `
+        <div style="background:#F0FDF4;border:1px solid #86EFAC;border-radius:10px;padding:14px;">
+          <div style="font-size:10.5px;color:#15803D;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px;"><i class="fas fa-check-circle" style="margin-right:5px;"></i>Resolution Notes</div>
+          <div style="font-size:13px;color:#374151;">${c.resolution_notes}</div>
+          ${c.resolved_at ? `<div style="font-size:11px;color:#9CA3AF;margin-top:6px;">Resolved: ${formatDateTime(c.resolved_at)} by ${c.resolved_by_name||'—'}</div>` : ''}
+        </div>` : ''}
+
+        <!-- Actions -->
+        ${isManager && c.status === 'Pending' ? `
+        <div style="border:1.5px solid #DDD6FE;border-radius:10px;padding:14px;background:#F9F7FF;">
+          <div style="font-weight:700;font-size:12.5px;margin-bottom:10px;color:#7C3AED;"><i class="fas fa-user-check" style="margin-right:6px;"></i>Assign to Employee</div>
+          <div style="display:flex;gap:8px;">
+            <select id="icAssignEmpId" class="form-input" style="flex:1;">
+              <option value="">Select employee…</option>
+              ${empList.map(e => `<option value="${e.id}" ${e.id==c.assigned_to_employee_id?'selected':''}>${e.name} (${e.role})</option>`).join('')}
+            </select>
+            <button onclick="assignInternalComplaint(${c.id})" class="btn-primary btn-sm">Assign</button>
+          </div>
+        </div>` : ''}
+
+        ${canAct && c.status !== 'Resolved' ? `
+        <div style="border:1.5px solid #A7F3D0;border-radius:10px;padding:14px;background:#F0FDF4;">
+          <div style="font-weight:700;font-size:12.5px;margin-bottom:10px;color:#065F46;"><i class="fas fa-check-double" style="margin-right:6px;"></i>Update Status</div>
+          <div style="display:flex;gap:8px;margin-bottom:10px;">
+            ${c.status !== 'In-Progress' ? `<button onclick="updateICStatus(${c.id},'In-Progress')" style="flex:1;padding:8px;background:#EFF6FF;border:1px solid #BFDBFE;color:#1D4ED8;border-radius:9px;font-weight:600;font-size:12px;cursor:pointer;">
+              <i class="fas fa-spinner" style="margin-right:5px;"></i>Mark In-Progress
+            </button>` : ''}
+            <button onclick="document.getElementById('icResNotesWrap').style.display='block'" style="flex:1;padding:8px;background:#D1FAE5;border:1px solid #6EE7B7;color:#065F46;border-radius:9px;font-weight:600;font-size:12px;cursor:pointer;">
+              <i class="fas fa-check" style="margin-right:5px;"></i>Mark Resolved
+            </button>
+          </div>
+          <div id="icResNotesWrap" style="display:none;">
+            <textarea id="icResNotes" class="form-input" rows="2" placeholder="Resolution notes (optional)…" style="margin-bottom:8px;"></textarea>
+            <button onclick="updateICStatus(${c.id},'Resolved')" style="width:100%;padding:9px;background:linear-gradient(135deg,#10B981,#065F46);color:white;border:none;border-radius:9px;font-weight:700;cursor:pointer;">
+              <i class="fas fa-check-circle" style="margin-right:6px;"></i>Confirm Resolved
+            </button>
+          </div>
+        </div>` : ''}
+
+        <!-- Audit trail -->
+        ${audit_trail?.length ? `
+        <div>
+          <div style="font-weight:700;font-size:12.5px;color:#374151;margin-bottom:10px;"><i class="fas fa-history" style="color:#7C3AED;margin-right:6px;"></i>Activity Timeline</div>
+          <div class="timeline">
+            ${audit_trail.map(a => `
+            <div class="timeline-item">
+              <div style="font-size:12.5px;font-weight:600;color:#374151;">${a.description}</div>
+              <div style="font-size:11px;color:#9CA3AF;margin-top:2px;">${formatDateTime(a.created_at)} &bull; ${a.actor_name||'System'}</div>
+            </div>`).join('')}
+          </div>
+        </div>` : ''}
+
+      </div>
+    </div>
+  `)
+}
+
+async function assignInternalComplaint(id) {
+  const empId = document.getElementById('icAssignEmpId')?.value
+  if (!empId) { toast('Select an employee', 'error'); return }
+  const r = await api('POST', `/internal-complaints/${id}/assign`, { employee_id: parseInt(empId) })
+  if (r?.ok) { toast(r.data.message, 'success'); closeModal(); loadInternalComplaints() }
+  else toast(r?.data?.error || 'Failed', 'error')
+}
+
+async function updateICStatus(id, status) {
+  const resolution_notes = document.getElementById('icResNotes')?.value || ''
+  const r = await api('PATCH', `/internal-complaints/${id}/status`, { status, resolution_notes: resolution_notes || undefined })
+  if (r?.ok) { toast(`Status updated to ${status}`, 'success'); closeModal(); loadInternalComplaints() }
+  else toast(r?.data?.error || 'Failed', 'error')
 }
 
 // ── Modal ─────────────────────────────────────────────────────
@@ -3353,5 +4593,14 @@ Object.assign(window, {
   loadVehicles, showAddVehicleModal, submitVehicle, showVehicleDetail, showEditVehicle, updateVehicle, removeVehicle,
   viewRcDocument, filterVehicles, loadUnitResidents, previewRc, previewRcEdit,
   // Complaints Master
-  loadComplaintsMaster
+  loadComplaintsMaster,
+  showAddCategoryModal, submitAddCategory,
+  showEditCategoryModal, submitEditCategory, confirmDeleteCategory,
+  showAddSubCategoryModal, submitAddSubCategory,
+  showEditSubCategoryModal, submitEditSubCategory, confirmDeleteSubCategory,
+  // Unit Status
+  showUnitStatusModal, submitUnitStatus,
+  // Internal Complaints
+  loadInternalComplaints, showRegisterInternalComplaint, submitInternalComplaint,
+  showInternalComplaintDetail, assignInternalComplaint, updateICStatus
 })

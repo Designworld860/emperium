@@ -14,6 +14,7 @@ import notificationRoutes from './routes/notifications'
 import dashboardRoutes from './routes/dashboard'
 import calendarRoutes from './routes/calendar'
 import vehicleRoutes from './routes/vehicles'
+import internalComplaintRoutes from './routes/internal-complaints'
 
 type Bindings = {
   DB: D1Database
@@ -43,6 +44,7 @@ app.route('/api/notifications', notificationRoutes)
 app.route('/api/dashboard', dashboardRoutes)
 app.route('/api/calendar', calendarRoutes)
 app.route('/api/vehicles', vehicleRoutes)
+app.route('/api/internal-complaints', internalComplaintRoutes)
 
 // Health check
 app.get('/api/health', (c) => c.json({ status: 'ok', app: 'Emperium City GRS' }))

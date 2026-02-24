@@ -301,4 +301,190 @@ complaints.post('/:id/close', async (c) => {
   return c.json({ message: 'Complaint closed' })
 })
 
+// ═══════════════════════════════════════════════════════════════
+// ── COMPLAINT CATEGORIES CRUD (admin/sub_admin only) ──────────
+// ═══════════════════════════════════════════════════════════════
+
+// Get all categories (including inactive)
+complaints.get('/categories/all', async (c) => {
+  const user = getAuthUser(c.req.header('Authorization') || null)
+  if (!user || user.type !== 'employee' || !['admin','sub_admin'].includes(user.role as string)) {
+    return c.json({ error: 'Unauthorized' }, 403)
+  }
+  const result = await c.env.DB.prepare(
+    `SELECT cc.*, COUNT(csc.id) as sub_count
+     FROM complaint_categories cc
+     LEFT JOIN complaint_sub_categories csc ON csc.category_id = cc.id
+     GROUP BY cc.id ORDER BY cc.sort_order`
+  ).all()
+  return c.json({ categories: result.results })
+})
+
+// Create complaint category
+complaints.post('/categories', async (c) => {
+  const user = getAuthUser(c.req.header('Authorization') || null)
+  if (!user || user.type !== 'employee' || !['admin','sub_admin'].includes(user.role as string)) {
+    return c.json({ error: 'Unauthorized' }, 403)
+  }
+  const { name, icon, description } = await c.req.json()
+  if (!name?.trim()) return c.json({ error: 'Category name is required' }, 400)
+
+  // Get max sort_order
+  const maxSort = await c.env.DB.prepare(
+    `SELECT COALESCE(MAX(sort_order),0)+1 as next_order FROM complaint_categories`
+  ).first<any>()
+
+  const result = await c.env.DB.prepare(
+    `INSERT INTO complaint_categories (name, icon, description, sort_order, is_active, created_at)
+     VALUES (?, ?, ?, ?, 1, CURRENT_TIMESTAMP)`
+  ).bind(name.trim(), icon||'fa-exclamation-circle', description||null, maxSort?.next_order||1).run()
+
+  await auditLog(c.env.DB, 'created', 'complaint_category', result.meta.last_row_id as number,
+    `Category "${name}" created`, 'employee', user.id as number, user.name as string)
+
+  return c.json({ message: 'Category created', id: result.meta.last_row_id })
+})
+
+// Update complaint category
+complaints.put('/categories/:id', async (c) => {
+  const user = getAuthUser(c.req.header('Authorization') || null)
+  if (!user || user.type !== 'employee' || !['admin','sub_admin'].includes(user.role as string)) {
+    return c.json({ error: 'Unauthorized' }, 403)
+  }
+  const id = parseInt(c.req.param('id'))
+  const { name, icon, description, sort_order, is_active } = await c.req.json()
+  if (!name?.trim()) return c.json({ error: 'Category name is required' }, 400)
+
+  await c.env.DB.prepare(
+    `UPDATE complaint_categories SET name=?, icon=?, description=?, sort_order=?, is_active=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`
+  ).bind(name.trim(), icon||'fa-exclamation-circle', description||null, sort_order||1, is_active===false?0:1, id).run()
+
+  await auditLog(c.env.DB, 'updated', 'complaint_category', id,
+    `Category "${name}" updated`, 'employee', user.id as number, user.name as string)
+
+  return c.json({ message: 'Category updated' })
+})
+
+// Delete complaint category
+complaints.delete('/categories/:id', async (c) => {
+  const user = getAuthUser(c.req.header('Authorization') || null)
+  if (!user || user.type !== 'employee' || !['admin','sub_admin'].includes(user.role as string)) {
+    return c.json({ error: 'Unauthorized' }, 403)
+  }
+  const id = parseInt(c.req.param('id'))
+
+  // Check if used by existing complaints
+  const inUse = await c.env.DB.prepare(
+    `SELECT COUNT(*) as cnt FROM complaints WHERE category_id=?`
+  ).bind(id).first<any>()
+  if ((inUse?.cnt||0) > 0) {
+    return c.json({ error: `Cannot delete: ${inUse.cnt} complaint(s) use this category` }, 409)
+  }
+
+  // Delete sub-categories first
+  await c.env.DB.prepare(`DELETE FROM complaint_sub_categories WHERE category_id=?`).bind(id).run()
+  await c.env.DB.prepare(`DELETE FROM complaint_categories WHERE id=?`).bind(id).run()
+
+  await auditLog(c.env.DB, 'deleted', 'complaint_category', id,
+    `Category #${id} deleted`, 'employee', user.id as number, user.name as string)
+
+  return c.json({ message: 'Category deleted' })
+})
+
+// ═══════════════════════════════════════════════════════════════
+// ── COMPLAINT SUB-CATEGORIES CRUD (admin/sub_admin only) ──────
+// ═══════════════════════════════════════════════════════════════
+
+// Get all sub-categories (including inactive)
+complaints.get('/sub-categories/all', async (c) => {
+  const user = getAuthUser(c.req.header('Authorization') || null)
+  if (!user || user.type !== 'employee' || !['admin','sub_admin'].includes(user.role as string)) {
+    return c.json({ error: 'Unauthorized' }, 403)
+  }
+  const category_id = c.req.query('category_id')
+  let result
+  if (category_id) {
+    result = await c.env.DB.prepare(
+      `SELECT csc.*, cc.name as category_name FROM complaint_sub_categories csc
+       JOIN complaint_categories cc ON cc.id = csc.category_id
+       WHERE csc.category_id=? ORDER BY csc.sort_order`
+    ).bind(parseInt(category_id)).all()
+  } else {
+    result = await c.env.DB.prepare(
+      `SELECT csc.*, cc.name as category_name FROM complaint_sub_categories csc
+       JOIN complaint_categories cc ON cc.id = csc.category_id
+       ORDER BY cc.sort_order, csc.sort_order`
+    ).all()
+  }
+  return c.json({ sub_categories: result.results })
+})
+
+// Create sub-category
+complaints.post('/sub-categories', async (c) => {
+  const user = getAuthUser(c.req.header('Authorization') || null)
+  if (!user || user.type !== 'employee' || !['admin','sub_admin'].includes(user.role as string)) {
+    return c.json({ error: 'Unauthorized' }, 403)
+  }
+  const { category_id, name, description, typical_resolution_days } = await c.req.json()
+  if (!category_id || !name?.trim()) return c.json({ error: 'Category and name are required' }, 400)
+
+  const maxSort = await c.env.DB.prepare(
+    `SELECT COALESCE(MAX(sort_order),0)+1 as next_order FROM complaint_sub_categories WHERE category_id=?`
+  ).bind(parseInt(category_id)).first<any>()
+
+  const result = await c.env.DB.prepare(
+    `INSERT INTO complaint_sub_categories (category_id, name, description, typical_resolution_days, sort_order, is_active, created_at)
+     VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)`
+  ).bind(parseInt(category_id), name.trim(), description||null, typical_resolution_days||null, maxSort?.next_order||1).run()
+
+  await auditLog(c.env.DB, 'created', 'complaint_sub_category', result.meta.last_row_id as number,
+    `Sub-category "${name}" created`, 'employee', user.id as number, user.name as string)
+
+  return c.json({ message: 'Sub-category created', id: result.meta.last_row_id })
+})
+
+// Update sub-category
+complaints.put('/sub-categories/:id', async (c) => {
+  const user = getAuthUser(c.req.header('Authorization') || null)
+  if (!user || user.type !== 'employee' || !['admin','sub_admin'].includes(user.role as string)) {
+    return c.json({ error: 'Unauthorized' }, 403)
+  }
+  const id = parseInt(c.req.param('id'))
+  const { name, description, typical_resolution_days, sort_order, is_active, category_id } = await c.req.json()
+  if (!name?.trim()) return c.json({ error: 'Sub-category name is required' }, 400)
+
+  await c.env.DB.prepare(
+    `UPDATE complaint_sub_categories SET name=?, description=?, typical_resolution_days=?, sort_order=?, is_active=?, category_id=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`
+  ).bind(name.trim(), description||null, typical_resolution_days||null, sort_order||1, is_active===false?0:1, parseInt(category_id), id).run()
+
+  await auditLog(c.env.DB, 'updated', 'complaint_sub_category', id,
+    `Sub-category "${name}" updated`, 'employee', user.id as number, user.name as string)
+
+  return c.json({ message: 'Sub-category updated' })
+})
+
+// Delete sub-category
+complaints.delete('/sub-categories/:id', async (c) => {
+  const user = getAuthUser(c.req.header('Authorization') || null)
+  if (!user || user.type !== 'employee' || !['admin','sub_admin'].includes(user.role as string)) {
+    return c.json({ error: 'Unauthorized' }, 403)
+  }
+  const id = parseInt(c.req.param('id'))
+
+  // Check if in use
+  const inUse = await c.env.DB.prepare(
+    `SELECT COUNT(*) as cnt FROM complaints WHERE sub_category_id=?`
+  ).bind(id).first<any>()
+  if ((inUse?.cnt||0) > 0) {
+    return c.json({ error: `Cannot delete: ${inUse.cnt} complaint(s) use this sub-category` }, 409)
+  }
+
+  await c.env.DB.prepare(`DELETE FROM complaint_sub_categories WHERE id=?`).bind(id).run()
+
+  await auditLog(c.env.DB, 'deleted', 'complaint_sub_category', id,
+    `Sub-category #${id} deleted`, 'employee', user.id as number, user.name as string)
+
+  return c.json({ message: 'Sub-category deleted' })
+})
+
 export default complaints
