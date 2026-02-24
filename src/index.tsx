@@ -12,6 +12,8 @@ import kycRoutes from './routes/kyc'
 import searchRoutes from './routes/search'
 import notificationRoutes from './routes/notifications'
 import dashboardRoutes from './routes/dashboard'
+import calendarRoutes from './routes/calendar'
+import vehicleRoutes from './routes/vehicles'
 
 type Bindings = {
   DB: D1Database
@@ -39,6 +41,8 @@ app.route('/api/kyc', kycRoutes)
 app.route('/api/search', searchRoutes)
 app.route('/api/notifications', notificationRoutes)
 app.route('/api/dashboard', dashboardRoutes)
+app.route('/api/calendar', calendarRoutes)
+app.route('/api/vehicles', vehicleRoutes)
 
 // Health check
 app.get('/api/health', (c) => c.json({ status: 'ok', app: 'Emperium City GRS' }))

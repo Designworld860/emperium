@@ -929,8 +929,18 @@ async function closeComplaint(id) {
 }
 
 async function showRegisterComplaint() {
-  const catR = await api('GET', '/complaints/categories/list')
+  const [catR, subCatR] = await Promise.all([
+    api('GET', '/complaints/categories/list'),
+    api('GET', '/complaints/sub-categories/list')
+  ])
   const categories = catR?.data?.categories || []
+  const allSubCats = subCatR?.data?.sub_categories || []
+  const subByCat = {}
+  allSubCats.forEach(sc => {
+    if (!subByCat[sc.category_id]) subByCat[sc.category_id] = []
+    subByCat[sc.category_id].push(sc)
+  })
+  window._subByCat = subByCat
 
   let unitSelector = ''
   if (currentUser.type === 'customer') {
@@ -956,17 +966,24 @@ async function showRegisterComplaint() {
   ${unitSelector}
 
   <div class="mb-4">
-    <label class="form-label">Category *</label>
+    <label class="form-label">Complaint Type *</label>
     <div class="grid grid-cols-2 gap-3">
       ${categories.map(cat => `
       <label class="cursor-pointer">
-        <input type="radio" name="catId" value="${cat.id}" class="hidden peer"/>
+        <input type="radio" name="catId" value="${cat.id}" class="hidden peer" onchange="onCategoryChange(${cat.id})"/>
         <div class="peer-checked:ring-2 peer-checked:ring-blue-600 peer-checked:bg-blue-50 border rounded-lg p-3 text-center hover:bg-gray-50 transition">
           <div class="text-2xl mb-1"><i class="fas ${cat.icon || 'fa-tools'}"></i></div>
           <div class="text-sm font-medium">${cat.name}</div>
         </div>
       </label>`).join('')}
     </div>
+  </div>
+
+  <div class="mb-4" id="subCatSection" style="display:none">
+    <label class="form-label">Sub-Complaint Type</label>
+    <select id="compSubCatId" class="form-input">
+      <option value="">Select sub-type (optional)...</option>
+    </select>
   </div>
 
   <div class="mb-4">
@@ -981,7 +998,7 @@ async function showRegisterComplaint() {
 
   <div class="mb-4">
     <label class="form-label">Description *</label>
-    <textarea id="compDesc" class="form-input" rows="3" placeholder="Describe the issue in detail..."></textarea>
+    <textarea id="compDesc" class="form-input" rows="4" placeholder="Describe the issue in detail including location, severity, and any previous attempts to resolve..."></textarea>
   </div>
 
   <div class="mb-4">
@@ -1006,22 +1023,38 @@ async function showRegisterComplaint() {
   })
 }
 
+function onCategoryChange(catId) {
+  const subs = (window._subByCat || {})[catId] || []
+  const section = document.getElementById('subCatSection')
+  const select  = document.getElementById('compSubCatId')
+  if (subs.length) {
+    select.innerHTML = `<option value="">Select sub-type (optional)...</option>` +
+      subs.map(sc => `<option value="${sc.id}">${sc.name}</option>`).join('')
+    section.style.display = ''
+  } else {
+    section.style.display = 'none'
+    select.innerHTML = ''
+  }
+}
+
 async function submitComplaint() {
   const unit_id = parseInt(document.getElementById('compUnitId')?.value)
   const catEl = document.querySelector('input[name="catId"]:checked')
   const category_id = catEl ? parseInt(catEl.value) : null
+  const subCatEl = document.getElementById('compSubCatId')
+  const sub_category_id = subCatEl?.value ? parseInt(subCatEl.value) : null
   const description = document.getElementById('compDesc').value.trim()
   const priority = document.getElementById('compPriority').value
   const photoFile = document.getElementById('compPhoto').files[0]
 
   if (!unit_id) { toast('Select a unit', 'error'); return }
-  if (!category_id) { toast('Select a category', 'error'); return }
+  if (!category_id) { toast('Select a complaint type', 'error'); return }
   if (!description) { toast('Enter description', 'error'); return }
 
   let photo_data = null
   if (photoFile) photo_data = await fileToBase64(photoFile)
 
-  const r = await api('POST', '/complaints', { unit_id, category_id, description, priority, photo_data })
+  const r = await api('POST', '/complaints', { unit_id, category_id, sub_category_id, description, priority, photo_data })
   if (r?.ok) {
     toast(`Complaint ${r.data.complaint_no} registered!`, 'success')
     closeModal()
@@ -2335,6 +2368,663 @@ async function loadAudit() {
   </div>`
 }
 
+// ══════════════════════════════════════════════════════════════
+// ── EMPLOYEE CALENDAR ────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+let calView = 'month'
+let calYear = new Date().getFullYear()
+let calMonth = new Date().getMonth() + 1
+let calWeekStart = ''
+let calData = { visits: [], leaves: [], summary: {} }
+
+async function loadCalendar(params = {}) {
+  const content = document.getElementById('pageContent')
+  calView = params.view || calView || 'month'
+  calYear = params.year || calYear || new Date().getFullYear()
+  calMonth = params.month || calMonth || (new Date().getMonth() + 1)
+
+  content.innerHTML = `<div class="loading"><div class="spinner"></div></div>`
+
+  if (calView === 'week' && !calWeekStart) {
+    const now = new Date()
+    const day = now.getDay()
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1)
+    calWeekStart = new Date(new Date().setDate(diff)).toISOString().split('T')[0]
+  }
+
+  const qs = new URLSearchParams({ view: calView, year: calYear, month: calMonth })
+  if (calView === 'week' && calWeekStart) qs.set('week_start', calWeekStart)
+
+  const r = await api('GET', `/calendar?${qs}`)
+  if (!r?.ok) { content.innerHTML = `<p class="text-red-500 p-6">Failed to load calendar data</p>`; return }
+  calData = r.data
+  renderCalendar(content)
+}
+
+function renderCalendar(content) {
+  const { visits = [], leaves = [], summary = {} } = calData
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December']
+  const visitsByDate = {}
+  visits.forEach(v => { if (!visitsByDate[v.visit_date]) visitsByDate[v.visit_date] = []; visitsByDate[v.visit_date].push(v) })
+  const leaveDates = new Set(leaves.map(l => l.leave_date))
+
+  content.innerHTML = `
+  <div class="space-y-4">
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="text-xl font-bold text-gray-800"><i class="fas fa-calendar-alt text-blue-600 mr-2"></i>My Visit Calendar</h2>
+        <p class="text-sm text-gray-500 mt-1">Scheduled complaint visits assigned to you</p>
+      </div>
+      <button onclick="showApplyLeaveModal()" class="btn-primary px-4 py-2 rounded-xl text-sm">
+        <i class="fas fa-plus mr-1"></i>Apply Leave
+      </button>
+    </div>
+    <div class="grid grid-cols-4 gap-3">
+      <div class="card p-4 text-center"><div class="text-2xl font-bold text-blue-600">${summary.total||0}</div><div class="text-xs text-gray-500 mt-1">Total Visits</div></div>
+      <div class="card p-4 text-center"><div class="text-2xl font-bold text-green-600">${summary.today||0}</div><div class="text-xs text-gray-500 mt-1">Today</div></div>
+      <div class="card p-4 text-center"><div class="text-2xl font-bold text-indigo-600">${summary.upcoming||0}</div><div class="text-xs text-gray-500 mt-1">Upcoming</div></div>
+      <div class="card p-4 text-center"><div class="text-2xl font-bold text-red-500">${summary.overdue||0}</div><div class="text-xs text-gray-500 mt-1">Overdue</div></div>
+    </div>
+    <div class="card p-4">
+      <div class="flex items-center justify-between flex-wrap gap-3">
+        <div class="flex bg-gray-100 rounded-xl p-1 gap-1">
+          ${['month','week','today','all'].map(v => `<button onclick="switchCalView('${v}')" class="px-3 py-1 rounded-lg text-sm font-semibold transition-all ${calView===v?'bg-blue-700 text-white':'text-gray-600 hover:bg-gray-200'}">${v.charAt(0).toUpperCase()+v.slice(1)}</button>`).join('')}
+        </div>
+        ${calView==='month'?`<div class="flex items-center gap-2">
+          <button onclick="calNavMonth(-1)" class="p-1 rounded hover:bg-gray-100"><i class="fas fa-chevron-left"></i></button>
+          <span class="font-semibold text-gray-700 w-36 text-center">${monthNames[calMonth-1]} ${calYear}</span>
+          <button onclick="calNavMonth(1)" class="p-1 rounded hover:bg-gray-100"><i class="fas fa-chevron-right"></i></button>
+        </div>`:''}
+        ${calView==='week'?`<div class="flex items-center gap-2">
+          <button onclick="calNavWeek(-1)" class="p-1 rounded hover:bg-gray-100"><i class="fas fa-chevron-left"></i></button>
+          <span class="font-semibold text-gray-700 text-sm">Week of ${formatDate(calWeekStart)}</span>
+          <button onclick="calNavWeek(1)" class="p-1 rounded hover:bg-gray-100"><i class="fas fa-chevron-right"></i></button>
+        </div>`:''}
+      </div>
+      <div class="flex items-center gap-4 mt-3 text-xs">
+        <span class="flex items-center gap-1"><span class="w-3 h-3 bg-blue-200 rounded inline-block"></span>Scheduled Visit</span>
+        <span class="flex items-center gap-1"><span class="w-3 h-3 bg-red-200 rounded inline-block"></span>Approved Leave</span>
+        <span class="flex items-center gap-1"><span class="w-3 h-3 bg-yellow-300 rounded inline-block"></span>Today</span>
+      </div>
+    </div>
+    <div class="card p-4">
+      ${calView==='month' ? renderMonthGrid(visitsByDate, leaveDates) : renderVisitList(visits, leaveDates)}
+    </div>
+  </div>`
+}
+
+function renderMonthGrid(visitsByDate, leaveDates) {
+  const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+  const today = new Date().toISOString().split('T')[0]
+  const firstDay = new Date(calYear, calMonth-1, 1)
+  const lastDay  = new Date(calYear, calMonth, 0)
+  let startDow = firstDay.getDay()
+  startDow = startDow === 0 ? 6 : startDow - 1
+  const totalDays = lastDay.getDate()
+  const cells = []
+  for (let i = 0; i < startDow; i++) cells.push(null)
+  for (let d = 1; d <= totalDays; d++) cells.push(d)
+
+  let html = `<div class="grid grid-cols-7 gap-1">`
+  dayNames.forEach(d => { html += `<div class="text-center text-xs font-bold text-gray-400 py-2">${d}</div>` })
+  cells.forEach(day => {
+    if (!day) { html += `<div class="h-24 bg-gray-50 rounded"></div>`; return }
+    const dateStr = `${calYear}-${calMonth.toString().padStart(2,'0')}-${day.toString().padStart(2,'0')}`
+    const isToday = dateStr === today
+    const isLeave = leaveDates.has(dateStr)
+    const dayVisits = visitsByDate[dateStr] || []
+    html += `<div class="h-24 rounded-lg border p-1 cursor-pointer hover:border-blue-300 transition-all overflow-hidden ${isToday?'bg-yellow-50 border-yellow-400':isLeave?'bg-red-50 border-red-200':'bg-white border-gray-100'}" onclick="showDayDetail('${dateStr}')">
+      <div class="text-xs font-bold ${isToday?'text-yellow-700':'text-gray-700'} mb-1">${day}${isLeave?' <i class="fas fa-umbrella-beach text-red-400 text-xs"></i>':''}</div>
+      ${dayVisits.slice(0,3).map(v => `<div class="text-xs bg-blue-100 text-blue-800 rounded px-1 mb-0.5 truncate">${v.visit_time?v.visit_time.substring(0,5)+' ':''} ${v.unit_no}</div>`).join('')}
+      ${dayVisits.length>3?`<div class="text-xs text-gray-400">+${dayVisits.length-3} more</div>`:''}
+    </div>`
+  })
+  html += `</div>`
+  return html
+}
+
+function renderVisitList(visits, leaveDates) {
+  if (!visits.length) return `<div class="text-center py-12 text-gray-400"><i class="fas fa-calendar-check text-4xl mb-3"></i><p>No visits scheduled for this period</p></div>`
+  return `<div class="overflow-x-auto"><table class="w-full text-sm">
+    <thead><tr class="text-left text-xs text-gray-500 border-b">
+      <th class="py-2 pr-4">Date &amp; Time</th><th class="py-2 pr-4">Complaint</th><th class="py-2 pr-4">Unit</th>
+      <th class="py-2 pr-4">Category</th><th class="py-2 pr-4">Resident</th><th class="py-2 pr-4">Priority</th><th class="py-2">Status</th>
+    </tr></thead>
+    <tbody class="divide-y">
+      ${visits.map(v => `<tr class="hover:bg-gray-50 ${leaveDates.has(v.visit_date)?'bg-red-50':''}">
+        <td class="py-2 pr-4 whitespace-nowrap"><div class="font-medium">${formatDate(v.visit_date)}</div><div class="text-xs text-gray-400">${v.visit_time||'Time TBD'}</div></td>
+        <td class="py-2 pr-4"><button onclick="showComplaintDetail(${v.id})" class="text-blue-600 hover:underline font-mono text-xs">${v.complaint_no}</button></td>
+        <td class="py-2 pr-4 font-medium">${v.unit_no}</td>
+        <td class="py-2 pr-4"><div class="text-xs">${v.category_name}</div>${v.sub_category_name?`<div class="text-xs text-gray-400">${v.sub_category_name}</div>`:''}</td>
+        <td class="py-2 pr-4 text-xs">${v.customer_name||'—'}</td>
+        <td class="py-2 pr-4"><span class="${priorityColor(v.priority)} font-semibold text-xs">${v.priority}</span></td>
+        <td class="py-2">${statusBadge(v.status)}</td>
+      </tr>`).join('')}
+    </tbody></table></div>`
+}
+
+function switchCalView(v) {
+  calView = v
+  if (v === 'today') { const now = new Date(); calYear = now.getFullYear(); calMonth = now.getMonth()+1 }
+  loadCalendar()
+}
+function calNavMonth(dir) {
+  calMonth += dir
+  if (calMonth > 12) { calMonth = 1; calYear++ }
+  if (calMonth < 1)  { calMonth = 12; calYear-- }
+  loadCalendar()
+}
+function calNavWeek(dir) {
+  const d = new Date(calWeekStart); d.setDate(d.getDate() + dir*7)
+  calWeekStart = d.toISOString().split('T')[0]
+  loadCalendar()
+}
+
+function showDayDetail(dateStr) {
+  const visits = calData.visits.filter(v => v.visit_date === dateStr)
+  const isLeave = calData.leaves.some(l => l.leave_date === dateStr)
+  showModal(`<div class="p-4">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="font-bold text-gray-800"><i class="fas fa-calendar-day mr-2 text-blue-600"></i>${formatDate(dateStr)}</h3>
+      <button onclick="closeModal()" class="text-gray-400 hover:text-gray-700"><i class="fas fa-times"></i></button>
+    </div>
+    ${isLeave?`<div class="mb-3 p-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"><i class="fas fa-umbrella-beach mr-2"></i>Approved Leave Day</div>`:''}
+    ${!visits.length?`<p class="text-gray-400 text-center py-4">No visits scheduled</p>`:`
+    <div class="space-y-2">
+      ${visits.map(v=>`<div class="p-3 border rounded-lg hover:bg-gray-50">
+        <div class="flex items-center justify-between">
+          <span class="font-mono text-xs text-blue-600">${v.complaint_no}</span>
+          ${statusBadge(v.status)}
+        </div>
+        <div class="text-sm font-medium mt-1">Unit ${v.unit_no} – ${v.category_name}</div>
+        ${v.sub_category_name?`<div class="text-xs text-gray-500">${v.sub_category_name}</div>`:''}
+        <div class="text-xs text-gray-400 mt-1">${v.customer_name||''} ${v.visit_time?' · '+v.visit_time:''}</div>
+        <button onclick="closeModal();showComplaintDetail(${v.id})" class="mt-2 text-xs text-blue-600 hover:underline">View Complaint →</button>
+      </div>`).join('')}
+    </div>`}
+  </div>`)
+}
+
+function showApplyLeaveModal() {
+  const today = new Date().toISOString().split('T')[0]
+  showModal(`<div class="p-4">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="font-bold text-gray-800"><i class="fas fa-umbrella-beach mr-2 text-orange-500"></i>Apply for Leave</h3>
+      <button onclick="closeModal()" class="text-gray-400 hover:text-gray-700"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="space-y-3">
+      <div><label class="form-label">Leave Date *</label>
+        <input type="date" id="leaveDate" class="form-input" min="${today}" required/></div>
+      <div><label class="form-label">Leave Type</label>
+        <select id="leaveType" class="form-input">
+          <option value="Full Day">Full Day</option>
+          <option value="Half Day AM">Half Day – Morning</option>
+          <option value="Half Day PM">Half Day – Afternoon</option>
+        </select></div>
+      <div><label class="form-label">Reason</label>
+        <textarea id="leaveReason" class="form-input" rows="3" placeholder="Optional reason for leave..."></textarea></div>
+      <div class="flex gap-2 pt-2">
+        <button onclick="submitLeaveApplication()" class="btn-primary flex-1 py-2 rounded-xl">Submit Application</button>
+        <button onclick="closeModal()" class="flex-1 py-2 border rounded-xl text-gray-600">Cancel</button>
+      </div>
+    </div>
+  </div>`)
+}
+
+async function submitLeaveApplication() {
+  const leave_date = document.getElementById('leaveDate').value
+  const leave_type = document.getElementById('leaveType').value
+  const reason     = document.getElementById('leaveReason').value
+  if (!leave_date) { toast('Please select a leave date', 'error'); return }
+  const r = await api('POST', '/calendar/leaves', { leave_date, leave_type, reason })
+  if (r?.ok) { toast('Leave application submitted!', 'success'); closeModal(); loadLeaveManagement() }
+  else toast(r?.data?.error || 'Failed to submit leave', 'error')
+}
+
+// ══════════════════════════════════════════════════════════════
+// ── LEAVE MANAGEMENT ─────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+async function loadLeaveManagement() {
+  const content = document.getElementById('pageContent')
+  content.innerHTML = `<div class="loading"><div class="spinner"></div></div>`
+  const isManager = ['admin','sub_admin'].includes(currentUser.role)
+  const r = await api('GET', `/calendar/leaves`)
+  if (!r?.ok) { content.innerHTML = `<p class="text-red-500 p-6">Failed to load leaves</p>`; return }
+  const { leaves = [], pendingCount = 0 } = r.data
+
+  content.innerHTML = `
+  <div class="space-y-4">
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="text-xl font-bold text-gray-800"><i class="fas fa-umbrella-beach text-orange-500 mr-2"></i>Leave Management</h2>
+        <p class="text-sm text-gray-500 mt-1">${isManager ? 'Review and approve employee leave requests' : 'Your leave applications'}</p>
+      </div>
+      <div class="flex gap-2">
+        ${isManager && pendingCount > 0 ? `<span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-semibold">${pendingCount} Pending</span>` : ''}
+        ${!isManager ? `<button onclick="showApplyLeaveModal()" class="btn-primary px-4 py-2 rounded-xl text-sm"><i class="fas fa-plus mr-1"></i>Apply Leave</button>` : ''}
+      </div>
+    </div>
+    <div class="card p-4">
+      <div class="flex gap-2 flex-wrap">
+        ${['All','Pending','Approved','Rejected'].map(s => `<button onclick="filterLeaves('${s}')" id="leaveTab${s}"
+          class="px-3 py-1 rounded-full text-xs font-semibold border transition-all ${s==='All'?'bg-blue-700 text-white border-blue-700':'text-gray-600 border-gray-300 hover:bg-gray-100'}">${s}</button>`).join('')}
+      </div>
+    </div>
+    <div class="card p-4">
+      <div id="leaveTableContainer">${renderLeaveTable(leaves, isManager)}</div>
+    </div>
+  </div>`
+  window._allLeaves = leaves
+}
+
+function renderLeaveTable(leaves, isManager) {
+  if (!leaves.length) return `<div class="text-center py-8 text-gray-400"><i class="fas fa-calendar-times text-3xl mb-2"></i><p>No leave records found</p></div>`
+  return `<div class="overflow-x-auto"><table class="w-full text-sm">
+    <thead><tr class="text-left text-xs text-gray-500 border-b">
+      ${isManager?'<th class="py-2 pr-4">Employee</th>':''}
+      <th class="py-2 pr-4">Leave Date</th><th class="py-2 pr-4">Type</th><th class="py-2 pr-4">Reason</th>
+      <th class="py-2 pr-4">Status</th><th class="py-2 pr-4">Applied On</th><th class="py-2">Actions</th>
+    </tr></thead>
+    <tbody class="divide-y">
+      ${leaves.map(l=>`<tr class="hover:bg-gray-50">
+        ${isManager?`<td class="py-2 pr-4 font-medium">${l.employee_name}<div class="text-xs text-gray-400">${l.department||''}</div></td>`:''}
+        <td class="py-2 pr-4 whitespace-nowrap font-medium">${formatDate(l.leave_date)}</td>
+        <td class="py-2 pr-4 text-xs">${l.leave_type}</td>
+        <td class="py-2 pr-4 text-xs text-gray-600 max-w-xs">${l.reason||'—'}</td>
+        <td class="py-2 pr-4">${leaveStatusBadge(l.status)}</td>
+        <td class="py-2 pr-4 text-xs text-gray-400">${formatDate(l.applied_at)}</td>
+        <td class="py-2">
+          ${isManager&&l.status==='Pending'?`
+            <button onclick="reviewLeave(${l.id},'approve')" class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded mr-1 hover:bg-green-200"><i class="fas fa-check mr-1"></i>Approve</button>
+            <button onclick="reviewLeave(${l.id},'reject')" class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200"><i class="fas fa-times mr-1"></i>Reject</button>`:''}
+          ${!isManager&&l.status==='Pending'?`<button onclick="cancelLeave(${l.id})" class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded hover:bg-gray-200"><i class="fas fa-trash mr-1"></i>Cancel</button>`:''}
+          ${l.review_remarks?`<div class="text-xs text-gray-400 mt-1">Note: ${l.review_remarks.substring(0,40)}</div>`:''}
+        </td>
+      </tr>`).join('')}
+    </tbody></table></div>`
+}
+
+function leaveStatusBadge(status) {
+  const map = { Pending:'bg-yellow-100 text-yellow-800', Approved:'bg-green-100 text-green-800', Rejected:'bg-red-100 text-red-800' }
+  return `<span class="${map[status]||'bg-gray-100 text-gray-600'} px-2 py-0.5 rounded-full text-xs font-semibold">${status}</span>`
+}
+
+function filterLeaves(status) {
+  ['All','Pending','Approved','Rejected'].forEach(s => {
+    const btn = document.getElementById('leaveTab'+s)
+    if (btn) btn.className = `px-3 py-1 rounded-full text-xs font-semibold border transition-all ${s===status?'bg-blue-700 text-white border-blue-700':'text-gray-600 border-gray-300 hover:bg-gray-100'}`
+  })
+  const isManager = ['admin','sub_admin'].includes(currentUser.role)
+  const filtered = status==='All' ? window._allLeaves : (window._allLeaves||[]).filter(l=>l.status===status)
+  document.getElementById('leaveTableContainer').innerHTML = renderLeaveTable(filtered, isManager)
+}
+
+async function reviewLeave(id, action) {
+  const remarks = action==='reject' ? (prompt('Reason for rejection (optional):') || '') : ''
+  const r = await api('POST', `/calendar/leaves/${id}/${action}`, { remarks })
+  if (r?.ok) { toast(action==='approve'?'Leave approved!':'Leave rejected', 'success'); loadLeaveManagement() }
+  else toast(r?.data?.error||'Action failed', 'error')
+}
+
+async function cancelLeave(id) {
+  if (!confirm('Cancel this leave application?')) return
+  const r = await api('DELETE', `/calendar/leaves/${id}`, null)
+  if (r?.ok) { toast('Leave cancelled', 'success'); loadLeaveManagement() }
+  else toast(r?.data?.error||'Failed to cancel', 'error')
+}
+
+// ══════════════════════════════════════════════════════════════
+// ── VEHICLES ─────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+async function loadVehicles() {
+  const content = document.getElementById('pageContent')
+  content.innerHTML = `<div class="loading"><div class="spinner"></div></div>`
+  const r = await api('GET', '/vehicles')
+  if (!r?.ok) { content.innerHTML = `<p class="text-red-500 p-6">Failed to load vehicles</p>`; return }
+  const { vehicles = [] } = r.data
+
+  content.innerHTML = `
+  <div class="space-y-4">
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="text-xl font-bold text-gray-800"><i class="fas fa-car text-blue-600 mr-2"></i>Vehicle Registry</h2>
+        <p class="text-sm text-gray-500 mt-1">${vehicles.length} vehicle(s) registered</p>
+      </div>
+      <button onclick="showAddVehicleModal()" class="btn-primary px-4 py-2 rounded-xl text-sm">
+        <i class="fas fa-plus mr-1"></i>Register Vehicle
+      </button>
+    </div>
+    <div class="card p-4">
+      <input type="text" id="vehicleSearch" placeholder="Search by vehicle number, unit, or owner..."
+        class="form-input" oninput="filterVehicles(this.value)"/>
+    </div>
+    <div id="vehicleList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      ${renderVehicleCards(vehicles)}
+    </div>
+  </div>`
+  window._allVehicles = vehicles
+}
+
+function renderVehicleCards(vehicles) {
+  if (!vehicles.length) return `<div class="col-span-3 text-center py-12 text-gray-400"><i class="fas fa-car text-4xl mb-3"></i><p>No vehicles registered</p></div>`
+  const typeIcons = { Car:'fa-car', Bike:'fa-motorcycle', Scooter:'fa-motorcycle', Truck:'fa-truck', Other:'fa-car-side' }
+  return vehicles.map(v => `
+    <div class="card p-4">
+      <div class="flex items-start justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+            <i class="fas ${typeIcons[v.vehicle_type]||'fa-car'} text-blue-600"></i>
+          </div>
+          <div>
+            <div class="font-bold text-gray-800 font-mono tracking-wide">${v.vehicle_number}</div>
+            <div class="text-xs text-gray-500">${v.vehicle_type}${v.make?' · '+v.make:''} ${v.model||''}</div>
+          </div>
+        </div>
+        <div class="flex gap-1">
+          <button onclick="showVehicleDetail(${v.id})" class="text-blue-500 p-1 hover:bg-blue-50 rounded" title="View Details"><i class="fas fa-eye text-sm"></i></button>
+          <button onclick="showEditVehicle(${v.id})" class="text-green-500 p-1 hover:bg-green-50 rounded" title="Edit"><i class="fas fa-edit text-sm"></i></button>
+          <button onclick="removeVehicle(${v.id})" class="text-red-400 p-1 hover:bg-red-50 rounded" title="Remove"><i class="fas fa-trash text-sm"></i></button>
+        </div>
+      </div>
+      <div class="mt-3 pt-3 border-t grid grid-cols-2 gap-2 text-xs">
+        <div><span class="text-gray-400">Unit:</span> <span class="font-medium">${v.unit_no}</span></div>
+        <div><span class="text-gray-400">Color:</span> <span class="font-medium">${v.color||'—'}</span></div>
+        <div><span class="text-gray-400">Owner:</span> <span class="font-medium">${v.owner_name||'—'}</span></div>
+        <div><span class="text-gray-400">Tenant:</span> <span class="font-medium">${v.tenant_name||'—'}</span></div>
+      </div>
+      ${v.rc_file_data ? `<div class="mt-2"><button onclick="viewRcDocument(${v.id})" class="text-xs text-blue-600 hover:underline"><i class="fas fa-file-pdf mr-1"></i>View RC Document</button></div>`
+        : '<div class="mt-2 text-xs text-gray-400"><i class="fas fa-exclamation-circle mr-1"></i>No RC uploaded</div>'}
+      <div class="mt-1 text-xs text-gray-400">Registered ${formatDate(v.registered_at)}</div>
+    </div>`).join('')
+}
+
+function filterVehicles(q) {
+  const query = q.toLowerCase()
+  const filtered = (window._allVehicles||[]).filter(v =>
+    v.vehicle_number.toLowerCase().includes(query) ||
+    (v.unit_no||'').toLowerCase().includes(query) ||
+    (v.owner_name||'').toLowerCase().includes(query) ||
+    (v.tenant_name||'').toLowerCase().includes(query) ||
+    (v.make||'').toLowerCase().includes(query))
+  document.getElementById('vehicleList').innerHTML = renderVehicleCards(filtered)
+}
+
+async function showAddVehicleModal(prefillUnitId) {
+  const ur = await api('GET', '/units?limit=300')
+  const unitOpts = (ur?.data?.units||[]).map(u =>
+    `<option value="${u.id}" ${prefillUnitId&&u.id==prefillUnitId?'selected':''}>Unit ${u.unit_no} – ${u.owner_name||'Vacant'}</option>`
+  ).join('')
+
+  showModal(`<div class="p-4 overflow-y-auto" style="max-height:90vh">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="font-bold text-gray-800"><i class="fas fa-car mr-2 text-blue-600"></i>Register Vehicle</h3>
+      <button onclick="closeModal()" class="text-gray-400 hover:text-gray-700"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="space-y-3">
+      <div>
+        <label class="form-label">Unit *</label>
+        <select id="vUnit" class="form-input" onchange="loadUnitResidents(this.value)">
+          <option value="">Select unit...</option>${unitOpts}
+        </select>
+      </div>
+      <div id="residentFields"></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="form-label">Vehicle Number *</label>
+          <input type="text" id="vNumber" class="form-input" placeholder="e.g. MH12AB1234" oninput="this.value=this.value.toUpperCase()"/></div>
+        <div><label class="form-label">Vehicle Type</label>
+          <select id="vType" class="form-input"><option>Car</option><option>Bike</option><option>Scooter</option><option>Truck</option><option>Other</option></select></div>
+      </div>
+      <div class="grid grid-cols-3 gap-3">
+        <div><label class="form-label">Make</label><input type="text" id="vMake" class="form-input" placeholder="Honda"/></div>
+        <div><label class="form-label">Model</label><input type="text" id="vModel" class="form-input" placeholder="City"/></div>
+        <div><label class="form-label">Color</label><input type="text" id="vColor" class="form-input" placeholder="Silver"/></div>
+      </div>
+      <div>
+        <label class="form-label">RC Document (Registration Certificate)</label>
+        <input type="file" id="vRcFile" accept="image/*,.pdf" class="form-input" onchange="previewRc(this)"/>
+        <div id="rcPreview" class="mt-2"></div>
+      </div>
+      <div class="flex gap-2 pt-2">
+        <button onclick="submitVehicle()" class="btn-primary flex-1 py-2 rounded-xl">Register Vehicle</button>
+        <button onclick="closeModal()" class="flex-1 py-2 border rounded-xl text-gray-600">Cancel</button>
+      </div>
+    </div>
+  </div>`)
+
+  if (prefillUnitId) loadUnitResidents(prefillUnitId)
+}
+
+async function loadUnitResidents(unitId) {
+  if (!unitId) { document.getElementById('residentFields').innerHTML = ''; return }
+  const r = await api('GET', `/units/${unitId}`)
+  if (!r?.ok) return
+  const { unit } = r.data
+  const owner = unit.owner
+  const tenants = unit.tenants || []
+  let html = ''
+  if (owner || tenants.length) {
+    html = `<div><label class="form-label">Resident (Owner / Tenant)</label>
+      <select id="vResident" class="form-input">
+        <option value="">Select resident...</option>
+        ${owner?`<option value="owner:${owner.id}">Owner – ${owner.name}</option>`:''}
+        ${tenants.filter(t=>t.is_active).map(t=>`<option value="tenant:${t.id}">Tenant – ${t.name}</option>`).join('')}
+      </select></div>`
+  }
+  document.getElementById('residentFields').innerHTML = html
+}
+
+async function previewRc(input) {
+  if (!input.files[0]) return
+  const file = input.files[0]
+  const b64 = await fileToBase64(file)
+  input._b64 = b64; input._fname = file.name
+  const preview = document.getElementById('rcPreview')
+  if (file.type.startsWith('image/')) preview.innerHTML = `<img src="${b64}" class="w-48 h-32 object-cover rounded border"/>`
+  else preview.innerHTML = `<div class="text-xs text-gray-600 mt-1"><i class="fas fa-file-pdf text-red-500 mr-1"></i>${file.name}</div>`
+}
+
+async function submitVehicle() {
+  const unit_id = document.getElementById('vUnit').value
+  const vNumber = document.getElementById('vNumber').value.trim().toUpperCase()
+  const vType   = document.getElementById('vType').value
+  const vMake   = document.getElementById('vMake').value.trim()
+  const vModel  = document.getElementById('vModel').value.trim()
+  const vColor  = document.getElementById('vColor').value.trim()
+  const rcInput = document.getElementById('vRcFile')
+
+  if (!unit_id || !vNumber) { toast('Unit and vehicle number are required', 'error'); return }
+
+  let customer_id = null, tenant_id = null
+  const resEl = document.getElementById('vResident')
+  if (resEl?.value) { const [type,id] = resEl.value.split(':'); if(type==='owner') customer_id=parseInt(id); else tenant_id=parseInt(id) }
+
+  const r = await api('POST', '/vehicles', {
+    unit_id: parseInt(unit_id), customer_id, tenant_id,
+    vehicle_number: vNumber, vehicle_type: vType,
+    vehicle_make: vMake||null, vehicle_model: vModel||null, vehicle_color: vColor||null,
+    rc_file_name: rcInput._fname||null, rc_file_data: rcInput._b64||null
+  })
+  if (r?.ok) { toast('Vehicle registered!', 'success'); closeModal(); loadVehicles() }
+  else toast(r?.data?.error||'Failed to register vehicle', 'error')
+}
+
+async function showVehicleDetail(id) {
+  const r = await api('GET', `/vehicles/${id}`)
+  if (!r?.ok) { toast('Failed to load vehicle', 'error'); return }
+  const v = r.data.vehicle
+  showModal(`<div class="p-4">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="font-bold text-gray-800"><i class="fas fa-car mr-2 text-blue-600"></i>${v.vehicle_number}</h3>
+      <button onclick="closeModal()" class="text-gray-400"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="grid grid-cols-2 gap-3 text-sm">
+      <div><span class="text-gray-400">Unit</span><div class="font-semibold">${v.unit_no}</div></div>
+      <div><span class="text-gray-400">Type</span><div class="font-semibold">${v.vehicle_type}</div></div>
+      <div><span class="text-gray-400">Make / Model</span><div class="font-semibold">${v.make||'—'} ${v.model||''}</div></div>
+      <div><span class="text-gray-400">Color</span><div class="font-semibold">${v.color||'—'}</div></div>
+      <div><span class="text-gray-400">Owner</span><div class="font-semibold">${v.owner_name||'—'}</div></div>
+      <div><span class="text-gray-400">Tenant</span><div class="font-semibold">${v.tenant_name||'—'}</div></div>
+      <div><span class="text-gray-400">Registered</span><div class="font-semibold">${formatDate(v.registered_at)}</div></div>
+      <div><span class="text-gray-400">By</span><div class="font-semibold">${v.registered_by_name||'Self'}</div></div>
+    </div>
+    ${v.rc_file_data&&v.rc_file_data.startsWith('data:image')?`<div class="mt-4"><div class="text-xs text-gray-500 mb-1">RC Document</div><img src="${v.rc_file_data}" class="max-w-full rounded border" alt="RC"/></div>`:''}
+    ${v.rc_file_data&&!v.rc_file_data.startsWith('data:image')?`<div class="mt-4 p-3 bg-gray-50 rounded"><i class="fas fa-file-pdf text-red-500 mr-2"></i>${v.rc_file_name||'RC'}<a href="${v.rc_file_data}" download="${v.rc_file_name||'rc'}" class="ml-2 text-blue-600 text-xs hover:underline">Download</a></div>`:''}
+  </div>`)
+}
+
+async function showEditVehicle(id) {
+  const r = await api('GET', `/vehicles/${id}`)
+  if (!r?.ok) { toast('Failed to load', 'error'); return }
+  const v = r.data.vehicle
+  showModal(`<div class="p-4">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="font-bold text-gray-800"><i class="fas fa-edit mr-2"></i>Edit Vehicle</h3>
+      <button onclick="closeModal()" class="text-gray-400"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="space-y-3">
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="form-label">Vehicle Number *</label>
+          <input type="text" id="evNumber" class="form-input" value="${v.vehicle_number}" oninput="this.value=this.value.toUpperCase()"/></div>
+        <div><label class="form-label">Type</label>
+          <select id="evType" class="form-input">${['Car','Bike','Scooter','Truck','Other'].map(t=>`<option ${v.vehicle_type===t?'selected':''}>${t}</option>`).join('')}</select></div>
+      </div>
+      <div class="grid grid-cols-3 gap-3">
+        <div><label class="form-label">Make</label><input type="text" id="evMake" class="form-input" value="${v.make||''}"/></div>
+        <div><label class="form-label">Model</label><input type="text" id="evModel" class="form-input" value="${v.model||''}"/></div>
+        <div><label class="form-label">Color</label><input type="text" id="evColor" class="form-input" value="${v.color||''}"/></div>
+      </div>
+      <div>
+        <label class="form-label">Replace RC Document</label>
+        <input type="file" id="evRcFile" accept="image/*,.pdf" class="form-input" onchange="previewRcEdit(this)"/>
+        <div id="rcEditPreview">${v.rc_file_data&&v.rc_file_data.startsWith('data:image')?`<img src="${v.rc_file_data}" class="w-48 h-32 object-cover rounded border mt-1"/>`:v.rc_file_name?`<div class="text-xs text-gray-600 mt-1"><i class="fas fa-file-pdf text-red-500 mr-1"></i>${v.rc_file_name}</div>`:''}</div>
+      </div>
+      <div class="flex gap-2 pt-2">
+        <button onclick="updateVehicle(${v.id})" class="btn-primary flex-1 py-2 rounded-xl">Save Changes</button>
+        <button onclick="closeModal()" class="flex-1 py-2 border rounded-xl text-gray-600">Cancel</button>
+      </div>
+    </div>
+  </div>`)
+}
+
+async function previewRcEdit(input) {
+  if (!input.files[0]) return
+  const file = input.files[0]
+  const b64 = await fileToBase64(file)
+  input._b64 = b64; input._fname = file.name
+  const preview = document.getElementById('rcEditPreview')
+  if (file.type.startsWith('image/')) preview.innerHTML = `<img src="${b64}" class="w-48 h-32 object-cover rounded border mt-1"/>`
+  else preview.innerHTML = `<div class="text-xs text-gray-600 mt-1"><i class="fas fa-file-pdf text-red-500 mr-1"></i>${file.name}</div>`
+}
+
+async function updateVehicle(id) {
+  const rcInput = document.getElementById('evRcFile')
+  const r = await api('PUT', `/vehicles/${id}`, {
+    vehicle_number: document.getElementById('evNumber').value.trim().toUpperCase(),
+    vehicle_type:   document.getElementById('evType').value,
+    vehicle_make:   document.getElementById('evMake').value.trim()||null,
+    vehicle_model:  document.getElementById('evModel').value.trim()||null,
+    vehicle_color:  document.getElementById('evColor').value.trim()||null,
+    rc_file_name:   rcInput._fname||null,
+    rc_file_data:   rcInput._b64||null
+  })
+  if (r?.ok) { toast('Vehicle updated!', 'success'); closeModal(); loadVehicles() }
+  else toast(r?.data?.error||'Update failed', 'error')
+}
+
+async function removeVehicle(id) {
+  if (!confirm('Remove this vehicle from registry?')) return
+  const r = await api('DELETE', `/vehicles/${id}`, null)
+  if (r?.ok) { toast('Vehicle removed', 'success'); loadVehicles() }
+  else toast(r?.data?.error||'Failed to remove', 'error')
+}
+
+function viewRcDocument(vehicleId) {
+  const v = (window._allVehicles||[]).find(x => x.id == vehicleId)
+  if (!v?.rc_file_data) { toast('No RC document available', 'error'); return }
+  showModal(`<div class="p-4">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="font-bold">RC Document – ${v.vehicle_number}</h3>
+      <button onclick="closeModal()" class="text-gray-400"><i class="fas fa-times"></i></button>
+    </div>
+    ${v.rc_file_data.startsWith('data:image')?`<img src="${v.rc_file_data}" class="max-w-full rounded" alt="RC"/>`:
+    `<div class="p-4 bg-gray-50 rounded text-center">
+      <i class="fas fa-file-pdf text-red-500 text-4xl mb-2"></i>
+      <div class="text-sm mb-3">${v.rc_file_name||'RC Document'}</div>
+      <a href="${v.rc_file_data}" download="${v.rc_file_name||'rc'}" class="btn-primary px-4 py-2 rounded-xl inline-block text-sm">Download PDF</a>
+    </div>`}
+  </div>`)
+}
+
+// ══════════════════════════════════════════════════════════════
+// ── COMPLAINTS MASTER ────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+async function loadComplaintsMaster() {
+  const content = document.getElementById('pageContent')
+  content.innerHTML = `<div class="loading"><div class="spinner"></div></div>`
+
+  const [catR, subCatR] = await Promise.all([
+    api('GET', '/complaints/categories/list'),
+    api('GET', '/complaints/sub-categories/list')
+  ])
+  const categories = catR?.data?.categories || []
+  const subCategories = subCatR?.data?.sub_categories || []
+  const subByCat = {}
+  subCategories.forEach(sc => { if (!subByCat[sc.category_id]) subByCat[sc.category_id] = []; subByCat[sc.category_id].push(sc) })
+
+  const catIcons = { Plumbing:'fa-tint', Electricity:'fa-bolt', Civil:'fa-hammer', Billing:'fa-receipt', Miscellaneous:'fa-ellipsis-h' }
+  const catColors = { Plumbing:'blue', Electricity:'yellow', Civil:'green', Billing:'purple', Miscellaneous:'gray' }
+
+  content.innerHTML = `
+  <div class="space-y-4">
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="text-xl font-bold text-gray-800"><i class="fas fa-layer-group text-purple-600 mr-2"></i>Complaints Master</h2>
+        <p class="text-sm text-gray-500 mt-1">Complaint types and sub-types configuration</p>
+      </div>
+      <button onclick="showRegisterComplaint()" class="btn-primary px-4 py-2 rounded-xl text-sm">
+        <i class="fas fa-plus mr-1"></i>Register Complaint
+      </button>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      ${categories.map(cat => {
+        const subs = subByCat[cat.id] || []
+        const icon = catIcons[cat.name] || 'fa-exclamation-circle'
+        return `<div class="card p-4">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+              <i class="fas ${icon} text-purple-600"></i>
+            </div>
+            <div>
+              <div class="font-bold text-gray-800">${cat.name}</div>
+              <div class="text-xs text-gray-500">${subs.length} sub-type(s) available</div>
+            </div>
+          </div>
+          <div class="space-y-1">
+            ${subs.map((sc,i) => `<div class="flex items-center justify-between p-2 bg-gray-50 rounded-lg text-sm">
+              <span class="flex items-center gap-2">
+                <span class="w-5 h-5 bg-purple-200 text-purple-800 rounded-full text-xs flex items-center justify-center font-bold">${i+1}</span>
+                ${sc.name}
+              </span>
+              <span class="text-xs text-green-600"><i class="fas fa-check-circle"></i> Active</span>
+            </div>`).join('')}
+            ${!subs.length?'<div class="text-xs text-gray-400 text-center py-2">No sub-types defined</div>':''}
+          </div>
+        </div>`
+      }).join('')}
+    </div>
+    <div class="card p-4">
+      <h3 class="font-bold text-gray-700 mb-2"><i class="fas fa-info-circle text-blue-500 mr-2"></i>How to Register a Complaint</h3>
+      <ol class="text-sm text-gray-600 space-y-1 list-decimal list-inside">
+        <li>Select the <strong>Complaint Type</strong> (e.g. Plumbing, Electrical)</li>
+        <li>Select the <strong>Sub-Type</strong> for more specific categorization</li>
+        <li>Add a detailed <strong>Description</strong> of the issue</li>
+        <li>Optionally attach a <strong>Photo</strong> of the problem</li>
+        <li>Set <strong>Priority</strong> based on urgency</li>
+      </ol>
+    </div>
+  </div>`
+}
+
 // ── Modal ─────────────────────────────────────────────────────
 function showModal(content) {
   const overlay = document.createElement('div')
@@ -2357,7 +3047,7 @@ window.addEventListener('load', boot)
 Object.assign(window, {
   navigate, logout, doLogin, switchLoginTab, togglePwd, onSearch, markAllRead,
   showComplaintDetail, assignComplaint, scheduleVisit, resolveComplaint, closeComplaint,
-  showRegisterComplaint, submitComplaint, filterComplaints,
+  showRegisterComplaint, submitComplaint, filterComplaints, onCategoryChange,
   showUnitDetail, filterUnits, showRegisterComplaintForUnit, showAddComplaintForUnit: showRegisterComplaintForUnit,
   showCustomerDetail, showEditCustomer, showAddCustomer, addCustomer, updateCustomer, deleteCustomer,
   showAddTenant, addTenant, searchCustomers,
@@ -2366,5 +3056,14 @@ Object.assign(window, {
   switchKycManageTab, toggleDocHistory, viewDocumentImage,
   navigateToManageKyc_owner, navigateToManageKyc_tenant,
   showAddEmployee, addEmployee, showEditEmployee, updateEmployee, showEmpDetails, showResetEmpPwd, resetEmpPwd,
-  showModal, closeModal, loadKycTracker
+  showModal, closeModal, loadKycTracker,
+  // Calendar
+  loadCalendar, switchCalView, calNavMonth, calNavWeek, showDayDetail, showApplyLeaveModal, submitLeaveApplication,
+  // Leave
+  loadLeaveManagement, filterLeaves, reviewLeave, cancelLeave,
+  // Vehicles
+  loadVehicles, showAddVehicleModal, submitVehicle, showVehicleDetail, showEditVehicle, updateVehicle, removeVehicle,
+  viewRcDocument, filterVehicles, loadUnitResidents, previewRc, previewRcEdit,
+  // Complaints Master
+  loadComplaintsMaster
 })

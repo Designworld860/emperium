@@ -15,6 +15,22 @@ complaints.get('/categories/list', async (c) => {
   return c.json({ categories: result.results })
 })
 
+// Sub-categories list (optionally filtered by category_id)
+complaints.get('/sub-categories/list', async (c) => {
+  const category_id = c.req.query('category_id')
+  let result
+  if (category_id) {
+    result = await c.env.DB.prepare(
+      `SELECT * FROM complaint_sub_categories WHERE category_id = ? AND is_active = 1 ORDER BY sort_order`
+    ).bind(parseInt(category_id)).all()
+  } else {
+    result = await c.env.DB.prepare(
+      `SELECT * FROM complaint_sub_categories WHERE is_active = 1 ORDER BY category_id, sort_order`
+    ).all()
+  }
+  return c.json({ sub_categories: result.results })
+})
+
 // List complaints
 complaints.get('/', async (c) => {
   const user = getAuthUser(c.req.header('Authorization') || null)
@@ -57,8 +73,11 @@ complaints.get('/', async (c) => {
   const listParams = [...countParams, limit, offset]
   const result = await c.env.DB.prepare(
     `SELECT comp.*, u.unit_no, cc.name as category_name, cc.icon as category_icon,
+     sc.name as sub_category_name,
      c.name as customer_name, e.name as assigned_to_name, e2.name as resolved_by_name
-     ${baseJoin} ${whereSQL}
+     ${baseJoin}
+     LEFT JOIN complaint_sub_categories sc ON comp.sub_category_id = sc.id
+     ${whereSQL}
      ORDER BY comp.created_at DESC LIMIT ? OFFSET ?`
   ).bind(...listParams).all()
 
@@ -76,12 +95,14 @@ complaints.get('/:id', async (c) => {
 
   const comp = await c.env.DB.prepare(
     `SELECT comp.*, u.unit_no, cc.name as category_name, cc.icon as category_icon,
+     sc.name as sub_category_name,
      cust.name as customer_name, cust.email as customer_email, cust.mobile1 as customer_mobile,
      e.name as assigned_to_name, e.email as assigned_to_email,
      e2.name as assigned_by_name, e3.name as resolved_by_name
      FROM complaints comp
      JOIN units u ON comp.unit_id = u.id
      JOIN complaint_categories cc ON comp.category_id = cc.id
+     LEFT JOIN complaint_sub_categories sc ON comp.sub_category_id = sc.id
      LEFT JOIN customers cust ON comp.customer_id = cust.id
      LEFT JOIN employees e ON comp.assigned_to_employee_id = e.id
      LEFT JOIN employees e2 ON comp.assigned_by_employee_id = e2.id
@@ -107,6 +128,7 @@ complaints.post('/', async (c) => {
   // Coerce to integers to avoid type mismatch
   const unit_id = parseInt(body.unit_id)
   const category_id = parseInt(body.category_id)
+  const sub_category_id = body.sub_category_id ? parseInt(body.sub_category_id) : null
   const { description, photo_data, priority } = body
 
   if (!unit_id || !category_id || !description?.trim()) {
@@ -132,9 +154,9 @@ complaints.post('/', async (c) => {
   }
 
   const result = await c.env.DB.prepare(
-    `INSERT INTO complaints (complaint_no, unit_id, customer_id, category_id, description, photo_data, priority, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'Open')`
-  ).bind(complaintNo, unit_id, customerId, category_id, description.trim(), photo_data || null, priority || 'Normal').run()
+    `INSERT INTO complaints (complaint_no, unit_id, customer_id, category_id, sub_category_id, description, photo_data, priority, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Open')`
+  ).bind(complaintNo, unit_id, customerId, category_id, sub_category_id, description.trim(), photo_data || null, priority || 'Normal').run()
 
   const complaintId = result.meta.last_row_id as number
 
