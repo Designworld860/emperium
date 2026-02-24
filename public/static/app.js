@@ -20,13 +20,20 @@ function authHeaders() {
   return token ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' }
 }
 
+let _loggingOut = false
 async function api(method, path, data) {
   try {
     const opts = { method, headers: authHeaders() }
     if (data) opts.body = JSON.stringify(data)
     const r = await fetch(API + path, opts)
-    const json = await r.json()
-    if (r.status === 401) { logout(); return null }
+    let json = {}
+    try { json = await r.json() } catch {}
+    if (r.status === 401 && !path.includes('/auth/') && !_loggingOut) {
+      _loggingOut = true
+      logout()
+      setTimeout(() => { _loggingOut = false }, 2000)
+      return null
+    }
     return { ok: r.ok, status: r.status, data: json }
   } catch (e) {
     toast('Network error: ' + e.message, 'error')
@@ -95,13 +102,22 @@ async function boot() {
   currentUser = getStoredUser()
   const token = getToken()
   if (currentUser && token) {
-    const r = await api('GET', '/auth/me')
-    if (r?.ok) {
-      currentUser = r.data.user
-      saveUser(currentUser)
-      showApp()
-    } else {
-      showLogin()
+    // Verify token is still valid (bypass the 401 auto-logout in api())
+    try {
+      const r = await fetch(API + '/auth/me', { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } })
+      if (r.ok) {
+        const json = await r.json()
+        currentUser = json.user || currentUser
+        saveUser(currentUser)
+        showApp()
+      } else {
+        clearToken()
+        showLogin()
+      }
+    } catch {
+      // Offline or server error — still show app with cached user
+      if (currentUser) showApp()
+      else showLogin()
     }
   } else {
     showLogin()
@@ -313,6 +329,13 @@ function navigate(page, params = {}) {
     employees: loadEmployees,
     notifications: loadNotifications,
     audit: loadAudit,
+    'kyc-manage': (p) => {
+      if (p && p.ownerEntityType) {
+        openManageKyc(p.ownerEntityType, p.ownerEntityId, p.ownerName, p.unitNo, p.tenantEntityType, p.tenantEntityId, p.tenantName)
+      } else {
+        loadKycTracker()
+      }
+    }
   }
   if (pages[page]) pages[page](params)
   else content.innerHTML = `<p class="text-gray-400 text-center mt-20">Page not found</p>`
@@ -1130,7 +1153,7 @@ async function showUnitDetail(unitNo) {
           ${[['aadhar','Aadhar'],['pan','PAN'],['photo','Photo'],['sale_deed','Sale Deed'],['maintenance_agreement','Maint. Agr.']].map(([k,l]) => `
           <div class="flex items-center gap-1">${kycChip(owner_kyc[k])} ${l}</div>`).join('')}
         </div>
-        <button onclick="closeModal();navigate('kyc-tracker',{customerId:${owner.id},entityType:'customer'})" class="mt-2 btn-primary btn-sm w-full">Manage KYC</button>
+        <button onclick="closeModal();navigateToManageKyc_owner(${owner.id},this.dataset.name,'${unit.unit_no}')" data-name="${owner.name}" class="mt-2 btn-primary btn-sm w-full"><i class="fas fa-edit mr-1"></i>Manage KYC</button>
       </div>` : ''}` : '<p class="text-gray-400 text-sm">No owner registered</p>'}
     </div>
 
@@ -1388,7 +1411,7 @@ async function showCustomerDetail(id) {
         </div>`
       }).join('')}
     </div>
-    <button onclick="uploadKyc('tenant',${tenant.id},'tenancy_contract')" class="btn-secondary btn-sm mt-2">Manage Tenant KYC</button>
+    <button onclick="closeModal();navigateToManageKyc_tenant(${tenant.id},this.dataset.name,'${c.unit_no}')" data-name="${tenant.name}" class="btn-secondary btn-sm mt-2"><i class="fas fa-edit mr-1"></i>Manage Tenant KYC</button>
   </div>` : `
   <div class="mb-4 p-3 bg-gray-50 rounded-xl flex justify-between items-center">
     <span class="text-gray-500 text-sm">No active tenant</span>
@@ -1487,97 +1510,496 @@ async function addTenant(customerId, unitId) {
   else toast(r?.data?.error || 'Failed', 'error')
 }
 
-// ── KYC Upload ───────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// KYC MANAGEMENT — Full document upload + history trail
+// ═══════════════════════════════════════════════════════════════
+
+// Document type metadata
+const KYC_OWNER_DOCS = [
+  { key: 'aadhar',                label: 'Aadhar Card',           icon: 'fa-id-card',         color: '#3b82f6' },
+  { key: 'pan',                   label: 'PAN Card',              icon: 'fa-credit-card',     color: '#8b5cf6' },
+  { key: 'photo',                 label: 'Photograph',            icon: 'fa-camera',          color: '#ec4899' },
+  { key: 'sale_deed',             label: 'Sale Deed',             icon: 'fa-file-contract',   color: '#f59e0b' },
+  { key: 'maintenance_agreement', label: 'Maintenance Agreement', icon: 'fa-file-signature',  color: '#10b981' },
+]
+const KYC_TENANT_DOCS = [
+  { key: 'tenancy_contract',  label: 'Tenancy Contract',    icon: 'fa-file-contract',  color: '#f59e0b' },
+  { key: 'aadhar',            label: 'Aadhar Card',         icon: 'fa-id-card',        color: '#3b82f6' },
+  { key: 'pan',               label: 'PAN Card',            icon: 'fa-credit-card',    color: '#8b5cf6' },
+  { key: 'photo',             label: 'Photograph',          icon: 'fa-camera',         color: '#ec4899' },
+  { key: 'police_verification', label: 'Police Verification', icon: 'fa-shield-alt',  color: '#ef4444' },
+]
+
+// ── KYC Upload modal (triggered from quick buttons) ──────────
 function uploadKyc(entityType, entityId, docType) {
-  const labels = {
-    aadhar: 'Aadhar Card', pan: 'PAN Card', photo: 'Photograph',
-    sale_deed: 'Sale Deed', maintenance_agreement: 'Maintenance Agreement',
-    tenancy_contract: 'Tenancy Contract', police_verification: 'Police Verification'
+  openKycUploadModal(entityType, entityId, docType, null)
+}
+// ── Manage KYC full page ─────────────────────────────────────
+// Opens a full-page KYC management view showing:
+//  - Owner KYC documents tab (always shown)
+//  - Tenant KYC documents tab (shown if tenantId provided)
+// Each tab: document grid + per-document full version history
+
+async function openManageKyc(ownerEntityType, ownerEntityId, ownerName, unitNo, tenantEntityType, tenantEntityId, tenantName) {
+  // Persist state for refresh after upload
+  window._kycManageState = { entityType: ownerEntityType, entityId: ownerEntityId, entityName: ownerName, unitNo, ownerEntityType, ownerEntityId, ownerName }
+
+  const content = document.getElementById('pageContent')
+  if (content) content.innerHTML = '<div class="loading"><div class="spinner"></div></div>'
+
+  // Fetch owner KYC data
+  const ownerKycR = await api('GET', `/kyc/${ownerEntityType}/${ownerEntityId}`)
+  const ownerKyc = ownerKycR?.data || {}
+
+  // Fetch tenant KYC data if tenant exists
+  let tenantKyc = null
+  if (tenantEntityId) {
+    const tenantKycR = await api('GET', `/kyc/${tenantEntityType}/${tenantEntityId}`)
+    tenantKyc = tenantKycR?.data || null
   }
+
+  const hasTenant = !!(tenantEntityId && tenantKyc)
+  const activeTab = hasTenant ? (window._kycManageActiveTab || 'owner') : 'owner'
+
+  const ownerPct = ownerKyc.completion_percentage ?? 0
+  const tenantPct = tenantKyc?.completion_percentage ?? 0
+
+  if (content) content.innerHTML = `
+  <div class="max-w-5xl mx-auto">
+    <!-- Header -->
+    <div class="flex items-center gap-4 mb-6">
+      <button onclick="history.back()" class="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100">
+        <i class="fas fa-arrow-left text-lg"></i>
+      </button>
+      <div>
+        <h1 class="text-2xl font-bold text-gray-800"><i class="fas fa-id-card mr-2 text-blue-900"></i>Manage KYC – Unit ${unitNo}</h1>
+        <p class="text-gray-500 text-sm mt-0.5">Upload, replace, and track document versions for owner and tenant</p>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex gap-2 mb-6 border-b pb-0">
+      <button id="kycTabBtnOwner" onclick="switchKycManageTab('owner')"
+        class="px-5 py-3 text-sm font-semibold border-b-2 -mb-px transition-all ${activeTab==='owner' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-700'}">
+        <i class="fas fa-user mr-1.5"></i>Owner KYC
+        <span class="ml-2 px-2 py-0.5 rounded-full text-xs font-bold ${ownerPct===100?'bg-green-100 text-green-700':'bg-gray-100 text-gray-600'}">${ownerPct}%</span>
+      </button>
+      ${hasTenant ? `
+      <button id="kycTabBtnTenant" onclick="switchKycManageTab('tenant')"
+        class="px-5 py-3 text-sm font-semibold border-b-2 -mb-px transition-all ${activeTab==='tenant' ? 'border-orange-500 text-orange-600' : 'border-transparent text-gray-500 hover:text-gray-700'}">
+        <i class="fas fa-user-friends mr-1.5"></i>Tenant KYC – ${tenantName || 'Tenant'}
+        <span class="ml-2 px-2 py-0.5 rounded-full text-xs font-bold ${tenantPct===100?'bg-green-100 text-green-700':'bg-gray-100 text-gray-600'}">${tenantPct}%</span>
+      </button>` : `
+      <div class="px-5 py-3 text-sm text-gray-400 italic flex items-center gap-2">
+        <i class="fas fa-user-slash"></i>No active tenant
+      </div>`}
+    </div>
+
+    <!-- Owner Tab Content -->
+    <div id="kycPanelOwner" class="${activeTab==='owner' ? '' : 'hidden'}">
+      ${renderKycManagePanel('customer', ownerEntityId, ownerName, KYC_OWNER_DOCS, ownerKyc, 'blue')}
+    </div>
+
+    <!-- Tenant Tab Content -->
+    ${hasTenant ? `
+    <div id="kycPanelTenant" class="${activeTab==='tenant' ? '' : 'hidden'}">
+      ${renderKycManagePanel('tenant', tenantEntityId, tenantName, KYC_TENANT_DOCS, tenantKyc, 'orange')}
+    </div>` : ''}
+  </div>`
+
+  // Store tenant info for tab switches
+  window._kycManageData = { ownerEntityType, ownerEntityId, ownerName, unitNo, tenantEntityType, tenantEntityId, tenantName }
+}
+
+function switchKycManageTab(tab) {
+  window._kycManageActiveTab = tab
+  document.getElementById('kycPanelOwner')?.classList.toggle('hidden', tab !== 'owner')
+  document.getElementById('kycPanelTenant')?.classList.toggle('hidden', tab !== 'tenant')
+  const ownerBtn = document.getElementById('kycTabBtnOwner')
+  const tenantBtn = document.getElementById('kycTabBtnTenant')
+  if (ownerBtn) ownerBtn.className = ownerBtn.className.replace(/(border-blue-600 text-blue-700|border-transparent text-gray-500 hover:text-gray-700)/g, tab==='owner' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-700')
+  if (tenantBtn) tenantBtn.className = tenantBtn.className.replace(/(border-orange-500 text-orange-600|border-transparent text-gray-500 hover:text-gray-700)/g, tab==='tenant' ? 'border-orange-500 text-orange-600' : 'border-transparent text-gray-500 hover:text-gray-700')
+}
+
+function renderKycManagePanel(entityType, entityId, entityName, docList, kycData, color) {
+  const currentDocs = kycData.current_documents || []
+  const history = kycData.history || []
+  const pct = kycData.completion_percentage ?? 0
+  const missingTypes = kycData.missing_types || []
+
+  const colorMap = {
+    blue:   { bg: 'bg-blue-50',   header: 'bg-blue-600',   text: 'text-blue-700',   btn: 'bg-blue-600',   border: 'border-blue-200'  },
+    orange: { bg: 'bg-orange-50', header: 'bg-orange-500', text: 'text-orange-700', btn: 'bg-orange-500', border: 'border-orange-200' },
+  }
+  const c = colorMap[color] || colorMap.blue
+
+  // Group history by doc_type for quick lookup
+  const historyByType = {}
+  history.forEach(h => {
+    if (!historyByType[h.doc_type]) historyByType[h.doc_type] = []
+    historyByType[h.doc_type].push(h)
+  })
+
+  return `
+  <!-- Summary bar -->
+  <div class="card p-4 mb-6 flex flex-wrap items-center gap-4">
+    <div class="flex-1 min-w-48">
+      <div class="flex justify-between text-sm mb-1">
+        <span class="font-semibold text-gray-700">${entityName}</span>
+        <span class="font-bold ${pct===100?'text-green-600':'text-orange-500'}">${pct}% complete</span>
+      </div>
+      <div class="w-full bg-gray-100 rounded-full h-2.5">
+        <div class="h-2.5 rounded-full transition-all ${pct===100?'bg-green-500':pct>=60?'bg-yellow-400':'bg-red-400'}" style="width:${pct}%"></div>
+      </div>
+    </div>
+    <div class="flex items-center gap-3 text-sm">
+      <span class="text-green-600 font-semibold"><i class="fas fa-check-circle mr-1"></i>${docList.length - missingTypes.length} uploaded</span>
+      ${missingTypes.length > 0 ? `<span class="text-red-500 font-semibold"><i class="fas fa-times-circle mr-1"></i>${missingTypes.length} missing</span>` : ''}
+      ${pct===100 ? `<span class="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold"><i class="fas fa-check-double mr-1"></i>KYC Complete</span>` : ''}
+    </div>
+    <button onclick="openKycUploadModal('${entityType}',${entityId},null,'refreshManageKyc')" class="btn-primary btn-sm" id="quickUploadBtn_${entityType}_${entityId}">
+      <i class="fas fa-plus mr-1"></i>Upload New Document
+    </button>
+  </div>
+
+  <!-- Document Cards Grid -->
+  <div class="grid md:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
+    ${docList.map(doc => {
+      const current = currentDocs.find(d => d.doc_type === doc.key)
+      const docHistory = historyByType[doc.key] || []
+      const versionCount = docHistory.length
+      const isUploaded = !!current
+
+      return `
+      <div class="card border-l-4 ${isUploaded ? 'border-green-400' : 'border-red-300'}" style="border-left-color:${isUploaded ? '#4ade80' : '#fca5a5'}">
+        <div class="p-4">
+          <!-- Doc header -->
+          <div class="flex items-start justify-between mb-3">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:${doc.color}20">
+                <i class="fas ${doc.icon} text-base" style="color:${doc.color}"></i>
+              </div>
+              <div>
+                <div class="font-semibold text-gray-800 text-sm">${doc.label}</div>
+                <div class="text-xs ${isUploaded?'text-green-600 font-semibold':'text-red-500'}">
+                  ${isUploaded ? `<i class="fas fa-check-circle mr-0.5"></i>Uploaded` : `<i class="fas fa-exclamation-circle mr-0.5"></i>Not uploaded`}
+                </div>
+              </div>
+            </div>
+            ${versionCount > 1 ? `<span class="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold">${versionCount} versions</span>` : ''}
+          </div>
+
+          ${isUploaded && current ? `
+          <!-- Latest version info -->
+          <div class="bg-green-50 rounded-lg p-3 mb-3 text-xs space-y-1">
+            <div class="flex justify-between">
+              <span class="font-semibold text-green-800">Version ${current.version} (Latest)</span>
+              <span class="text-green-600">${formatDateTime(current.uploaded_at)}</span>
+            </div>
+            <div class="text-gray-600 flex items-center gap-1">
+              <i class="fas fa-user text-gray-400"></i>
+              ${current.uploaded_by_name || 'Staff'}
+            </div>
+            ${current.remarks ? `<div class="text-gray-500 italic"><i class="fas fa-comment mr-1"></i>${current.remarks}</div>` : ''}
+            ${current.file_data && current.file_data.startsWith('data:image') ? `
+            <div class="mt-2">
+              <img src="${current.file_data}" class="w-full max-h-32 object-cover rounded-lg cursor-pointer border border-green-200"
+                onclick="viewDocumentImage('${current.file_name}', '${current.file_data}')" title="Click to view full size"/>
+            </div>` : current.file_name ? `
+            <div class="flex items-center gap-2 mt-1 p-2 bg-white rounded border border-green-200">
+              <i class="fas fa-file-alt text-green-600"></i>
+              <span class="text-green-700 text-xs font-medium truncate">${current.file_name}</span>
+            </div>` : ''}
+          </div>` : `
+          <!-- Missing placeholder -->
+          <div class="bg-red-50 rounded-lg p-3 mb-3 text-xs text-red-500 text-center">
+            <i class="fas fa-upload text-red-300 text-2xl block mb-1"></i>
+            No document uploaded yet
+          </div>`}
+
+          <!-- Action buttons -->
+          <div class="flex gap-2">
+            <button onclick="openKycUploadModal('${entityType}',${entityId},'${doc.key}','refreshManageKyc')"
+              class="flex-1 text-xs px-3 py-2 rounded-lg font-semibold border transition-all hover:shadow-sm
+                ${isUploaded ? 'bg-white border-blue-200 text-blue-700 hover:bg-blue-50' : 'text-white border-transparent hover:opacity-90'}"
+              style="${isUploaded ? '' : 'background:' + doc.color}">
+              <i class="fas fa-${isUploaded ? 'redo' : 'upload'} mr-1"></i>
+              ${isUploaded ? 'Replace / Update' : 'Upload Now'}
+            </button>
+            ${versionCount > 0 ? `
+            <button onclick="toggleDocHistory('hist_${entityType}_${entityId}_${doc.key}')"
+              class="px-3 py-2 rounded-lg text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200">
+              <i class="fas fa-history mr-1"></i>History
+            </button>` : ''}
+          </div>
+        </div>
+
+        ${versionCount > 0 ? `
+        <!-- Version History (collapsible) -->
+        <div id="hist_${entityType}_${entityId}_${doc.key}" class="hidden border-t bg-gray-50">
+          <div class="px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wide flex justify-between items-center">
+            <span><i class="fas fa-history mr-1"></i>Full Version History</span>
+            <span class="text-blue-600">${versionCount} version${versionCount !== 1 ? 's' : ''}</span>
+          </div>
+          <div class="max-h-72 overflow-y-auto">
+            ${docHistory.map((h, idx) => `
+            <div class="px-4 py-3 border-t flex gap-3 ${idx===0 ? 'bg-green-50' : 'hover:bg-white'}">
+              <div class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold
+                ${idx===0 ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'}">
+                v${h.version}
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex justify-between items-start">
+                  <div class="text-xs font-semibold ${idx===0?'text-green-700':'text-gray-700'} truncate max-w-40">${h.file_name || doc.label}</div>
+                  ${idx===0 ? `<span class="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-semibold ml-1 flex-shrink-0">Latest</span>` : ''}
+                </div>
+                <div class="text-xs text-gray-500 mt-0.5">${formatDateTime(h.uploaded_at)}</div>
+                <div class="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                  <i class="fas fa-user"></i>${h.uploaded_by_name || 'Staff'}
+                </div>
+                ${h.remarks ? `<div class="text-xs text-gray-500 italic mt-1 flex gap-1"><i class="fas fa-comment text-gray-400 mt-0.5"></i><span>${h.remarks}</span></div>` : ''}
+                ${h.file_data && h.file_data.startsWith('data:image') ? `
+                <div class="mt-1.5">
+                  <img src="${h.file_data}" class="h-14 rounded border cursor-pointer hover:opacity-90 transition"
+                    onclick="viewDocumentImage('${h.file_name || doc.label}', '${h.file_data}')" title="Click to view"/>
+                </div>` : h.file_name ? `
+                <div class="mt-1 flex items-center gap-1.5 text-xs text-gray-500">
+                  <i class="fas fa-paperclip text-gray-400"></i>${h.file_name}
+                </div>` : ''}
+              </div>
+            </div>`).join('')}
+          </div>
+        </div>` : ''}
+      </div>`
+    }).join('')}
+  </div>`
+}
+
+// Open full-size document image viewer
+function viewDocumentImage(filename, dataUrl) {
+  if (!dataUrl) return
+  const overlay = document.createElement('div')
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer'
+  overlay.onclick = () => overlay.remove()
+  overlay.innerHTML = `
+    <div class="text-white text-sm mb-3 font-semibold">${filename || 'Document'} — Click anywhere to close</div>
+    <img src="${dataUrl}" class="max-w-full max-h-screen rounded-lg shadow-2xl" style="max-height:85vh;object-fit:contain" onclick="event.stopPropagation()"/>
+    <button class="mt-4 px-4 py-2 bg-white text-gray-800 rounded-lg font-semibold text-sm hover:bg-gray-100" onclick="overlay.remove()">Close</button>
+  `
+  document.body.appendChild(overlay)
+}
+
+// Toggle doc history panel
+function toggleDocHistory(id) {
+  const el = document.getElementById(id)
+  if (el) el.classList.toggle('hidden')
+}
+
+// ── KYC Upload (with dynamic doc-type select if no docType given) ──
+function openKycUploadModal(entityType, entityId, docType, onSuccessCallback) {
+  const allDocs = entityType === 'customer' ? KYC_OWNER_DOCS : KYC_TENANT_DOCS
+  const docMeta = docType ? (allDocs.find(d => d.key === docType) || { label: docType, icon: 'fa-file', color: '#6b7280' }) : null
+
   showModal(`
   <div class="flex justify-between items-center mb-4">
-    <h2 class="text-lg font-bold">Upload: ${labels[docType] || docType}</h2>
-    <button onclick="closeModal()" class="text-gray-400"><i class="fas fa-times"></i></button>
+    <h2 class="text-lg font-bold flex items-center gap-2">
+      ${docMeta ? `<i class="fas ${docMeta.icon}" style="color:${docMeta.color}"></i>` : '<i class="fas fa-cloud-upload-alt text-blue-600"></i>'}
+      ${docMeta ? 'Upload – ' + docMeta.label : 'Upload Document'}
+    </h2>
+    <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button>
   </div>
-  <div class="mb-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
-    <i class="fas fa-info-circle mr-1"></i>Upload a clear scan or photo of the document. Supported: JPEG, PNG, PDF (as image).
+
+  <div class="mb-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-700 flex gap-2">
+    <i class="fas fa-info-circle mt-0.5 flex-shrink-0"></i>
+    <span>Each upload creates a new version. All previous versions are permanently preserved in history.</span>
   </div>
-  <label class="form-label">Select File *</label>
-  <input type="file" id="kycFile" accept="image/*,application/pdf" class="form-input mb-4"/>
-  <div id="kycPreviewCont" class="hidden mb-4">
-    <img id="kycPreview" class="max-h-48 rounded-lg border"/>
+
+  ${!docType ? `
+  <div class="mb-4">
+    <label class="form-label">Document Type <span class="text-red-500">*</span></label>
+    <div class="grid grid-cols-2 gap-2">
+      ${allDocs.map(d => `
+      <label class="cursor-pointer">
+        <input type="radio" name="kycDocType" value="${d.key}" class="hidden peer"/>
+        <div class="peer-checked:ring-2 peer-checked:bg-blue-50 border rounded-xl p-3 flex items-center gap-2 hover:bg-gray-50 transition"
+          style="--checked-ring-color:${d.color}">
+          <i class="fas ${d.icon} text-sm" style="color:${d.color}"></i>
+          <span class="text-sm font-medium text-gray-700">${d.label}</span>
+        </div>
+      </label>`).join('')}
+    </div>
+  </div>` : `<input type="hidden" id="kycDocTypeFixed" value="${docType}"/>`}
+
+  <div class="mb-4">
+    <label class="form-label">Select File <span class="text-red-500">*</span></label>
+    <input type="file" id="kycFile" accept="image/*,application/pdf" class="form-input"/>
   </div>
-  <button onclick="submitKyc('${entityType}',${entityId},'${docType}')" class="btn-primary w-full">Upload Document</button>
+
+  <div id="kycPreviewCont" class="hidden mb-4 p-2 border rounded-xl bg-gray-50 text-center">
+    <img id="kycPreview" class="max-h-52 rounded-lg mx-auto border shadow-sm"/>
+    <div id="kycFileName" class="text-xs text-gray-500 mt-2"></div>
+  </div>
+
+  <div class="mb-4">
+    <label class="form-label">Remarks (optional)</label>
+    <input id="kycRemarks" class="form-input" placeholder="e.g. Original verified, renewal copy, etc."/>
+  </div>
+
+  <button onclick="submitKycFromModal('${entityType}',${entityId},'${docType || ''}','${onSuccessCallback || ''}')"
+    class="btn-primary w-full py-3">
+    <i class="fas fa-upload mr-2"></i>Upload Document
+  </button>
   `)
 
-  document.getElementById('kycFile').addEventListener('change', async (e) => {
+  document.getElementById('kycFile')?.addEventListener('change', async (e) => {
     const f = e.target.files[0]
-    if (f && f.type.startsWith('image/')) {
+    if (!f) return
+    document.getElementById('kycFileName').textContent = `${f.name} (${(f.size/1024).toFixed(1)} KB)`
+    document.getElementById('kycPreviewCont').classList.remove('hidden')
+    if (f.type.startsWith('image/')) {
       const data = await fileToBase64(f)
       document.getElementById('kycPreview').src = data
-      document.getElementById('kycPreviewCont').classList.remove('hidden')
+      document.getElementById('kycPreview').style.display = ''
+    } else {
+      document.getElementById('kycPreview').src = ''
+      document.getElementById('kycPreview').style.display = 'none'
     }
   })
 }
 
-async function submitKyc(entityType, entityId, docType) {
-  const file = document.getElementById('kycFile').files[0]
-  if (!file) { toast('Select a file', 'error'); return }
+async function submitKycFromModal(entityType, entityId, fixedDocType, callbackName) {
+  const file = document.getElementById('kycFile')?.files[0]
+  if (!file) { toast('Please select a file', 'error'); return }
+
+  let docType = (fixedDocType === 'null' || fixedDocType === '' || fixedDocType === 'undefined') ? '' : fixedDocType
+  if (!docType) {
+    const selected = document.querySelector('input[name="kycDocType"]:checked')
+    if (!selected) { toast('Please select a document type', 'error'); return }
+    docType = selected.value
+  }
+  if (!docType) {
+    const fixed = document.getElementById('kycDocTypeFixed')
+    docType = fixed?.value || ''
+  }
+  if (!docType) { toast('Document type not set', 'error'); return }
+
+  const remarks = document.getElementById('kycRemarks')?.value?.trim() || ''
   const file_data = await fileToBase64(file)
+
+  const btn = document.querySelector('.btn-primary[onclick*="submitKycFromModal"]')
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Uploading...' }
+
   const r = await api('POST', `/kyc/${entityType}/${entityId}`, {
-    doc_type: docType, file_name: file.name, file_data
+    doc_type: docType, file_name: file.name, file_data, remarks
   })
-  if (r?.ok) { toast(r.data.message, 'success'); closeModal() }
-  else toast(r?.data?.error || 'Upload failed', 'error')
+
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-upload mr-2"></i>Upload Document' }
+
+  if (r?.ok) {
+    toast(r.data.message || 'Document uploaded successfully!', 'success')
+    closeModal()
+    if (callbackName === 'refreshManageKyc') {
+      const s = window._kycManageData
+      if (s) openManageKyc(s.ownerEntityType, s.ownerEntityId, s.ownerName, s.unitNo, s.tenantEntityType, s.tenantEntityId, s.tenantName)
+    }
+  } else {
+    toast(r?.data?.error || 'Upload failed', 'error')
+  }
 }
 
-// ── KYC Tracker ───────────────────────────────────────────────
-async function loadKycTracker() {
+async function submitKyc(entityType, entityId, docType) {
+  await submitKycFromModal(entityType, entityId, docType, null)
+}
+
+// ── KYC Tracker (summary page) ────────────────────────────────
+async function loadKycTracker(params = {}) {
   const r = await api('GET', '/kyc/tracker/summary')
   if (!r?.ok) return
   const { owners = [], tenants = [] } = r.data
 
-  document.getElementById('pageContent').innerHTML = `
-  <h1 class="text-2xl font-bold text-gray-800 mb-6"><i class="fas fa-id-card mr-2 text-blue-900"></i>KYC Tracker</h1>
+  // Compute stats
+  const ownerComplete = owners.filter(o => o.has_aadhar && o.has_pan && o.has_photo && o.has_sale_deed && o.has_maint_agr).length
+  const tenantComplete = tenants.filter(t => t.has_contract && t.has_aadhar && t.has_pan && t.has_photo && t.has_police).length
 
-  <div class="flex gap-2 mb-4">
-    <button onclick="showKycTab('owners')" id="tab-owners" class="btn-primary btn-sm">Owners (${owners.length})</button>
-    <button onclick="showKycTab('tenants')" id="tab-tenants" class="px-3 py-1 rounded-md text-sm bg-gray-200 text-gray-700">Tenants (${tenants.length})</button>
+  document.getElementById('pageContent').innerHTML = `
+  <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
+    <h1 class="text-2xl font-bold text-gray-800"><i class="fas fa-id-card mr-2 text-blue-900"></i>KYC Tracker</h1>
+    <div class="flex gap-3">
+      <input type="text" id="kycSearch" placeholder="Search name, unit..." class="form-input w-56" oninput="filterKycTable('all', this.value)"/>
+    </div>
   </div>
 
-  <div id="kycTabOwners" class="card overflow-hidden">
-    <div class="p-4 bg-gray-50 border-b">
-      <input type="text" placeholder="Search owner..." class="form-input w-64" oninput="filterKycTable('owners', this.value)"/>
+  <!-- Summary Stats -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div class="card p-4 text-center border-t-4 border-blue-500">
+      <div class="text-2xl font-bold text-blue-700">${owners.length}</div>
+      <div class="text-xs text-gray-500 mt-1">Total Owners</div>
     </div>
+    <div class="card p-4 text-center border-t-4 border-green-500">
+      <div class="text-2xl font-bold text-green-600">${ownerComplete}</div>
+      <div class="text-xs text-gray-500 mt-1">Owner KYC Complete</div>
+    </div>
+    <div class="card p-4 text-center border-t-4 border-orange-400">
+      <div class="text-2xl font-bold text-orange-500">${tenants.length}</div>
+      <div class="text-xs text-gray-500 mt-1">Active Tenants</div>
+    </div>
+    <div class="card p-4 text-center border-t-4 border-purple-500">
+      <div class="text-2xl font-bold text-purple-600">${tenantComplete}</div>
+      <div class="text-xs text-gray-500 mt-1">Tenant KYC Complete</div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="flex gap-2 mb-4 border-b">
+    <button onclick="showKycTab('owners')" id="tab-owners"
+      class="px-5 py-3 text-sm font-semibold border-b-2 -mb-px border-blue-600 text-blue-700">
+      <i class="fas fa-user mr-1"></i>Owners (${owners.length})
+    </button>
+    <button onclick="showKycTab('tenants')" id="tab-tenants"
+      class="px-5 py-3 text-sm font-semibold border-b-2 -mb-px border-transparent text-gray-500 hover:text-gray-700">
+      <i class="fas fa-user-friends mr-1"></i>Tenants (${tenants.length})
+    </button>
+  </div>
+
+  <!-- Owners Tab -->
+  <div id="kycTabOwners" class="card overflow-hidden">
     <div class="overflow-x-auto">
       <table class="w-full text-sm">
         <thead class="bg-gray-50">
           <tr>
-            <th class="px-4 py-3 text-left font-semibold">Unit</th>
-            <th class="px-4 py-3 text-left font-semibold">Owner</th>
-            <th class="px-4 py-3 text-center font-semibold">Aadhar</th>
-            <th class="px-4 py-3 text-center font-semibold">PAN</th>
-            <th class="px-4 py-3 text-center font-semibold">Photo</th>
-            <th class="px-4 py-3 text-center font-semibold">Sale Deed</th>
-            <th class="px-4 py-3 text-center font-semibold">Maint. Agr.</th>
-            <th class="px-4 py-3 text-center font-semibold">Completion</th>
+            <th class="px-4 py-3 text-left font-semibold text-gray-600">Unit</th>
+            <th class="px-4 py-3 text-left font-semibold text-gray-600">Owner</th>
+            <th class="px-4 py-3 text-center font-semibold text-gray-600">Aadhar</th>
+            <th class="px-4 py-3 text-center font-semibold text-gray-600">PAN</th>
+            <th class="px-4 py-3 text-center font-semibold text-gray-600">Photo</th>
+            <th class="px-4 py-3 text-center font-semibold text-gray-600">Sale Deed</th>
+            <th class="px-4 py-3 text-center font-semibold text-gray-600">Maint. Agr.</th>
+            <th class="px-4 py-3 text-center font-semibold text-gray-600">Completion</th>
+            <th class="px-4 py-3 text-center font-semibold text-gray-600">Action</th>
           </tr>
         </thead>
         <tbody id="kycOwnersBody">
           ${owners.map(o => {
-            const done = [o.has_aadhar,o.has_pan,o.has_photo,o.has_sale_deed,o.has_maint_agr].filter(Boolean).length
+            const vals = [o.has_aadhar, o.has_pan, o.has_photo, o.has_sale_deed, o.has_maint_agr]
+            const done = vals.filter(Boolean).length
             const pct = Math.round(done/5*100)
             return `<tr class="table-row border-t">
-              <td class="px-4 py-2 font-bold text-blue-900">Unit ${o.unit_no}</td>
-              <td class="px-4 py-2">${o.name}</td>
-              ${[o.has_aadhar,o.has_pan,o.has_photo,o.has_sale_deed,o.has_maint_agr].map(v => `<td class="px-4 py-2 text-center">${v ? '<i class="fas fa-check-circle text-green-500"></i>' : '<i class="fas fa-times-circle text-red-400"></i>'}</td>`).join('')}
-              <td class="px-4 py-2 text-center">
+              <td class="px-4 py-2 font-bold text-blue-900 cursor-pointer hover:underline" onclick="showUnitDetail('${o.unit_no}')">Unit ${o.unit_no}</td>
+              <td class="px-4 py-2 font-medium">${o.name}</td>
+              ${vals.map(v => `<td class="px-4 py-2 text-center">${v
+                ? '<i class="fas fa-check-circle text-green-500 text-base"></i>'
+                : '<i class="fas fa-times-circle text-red-400 text-base"></i>'}</td>`).join('')}
+              <td class="px-4 py-2">
                 <div class="flex items-center gap-2">
-                  <div class="flex-1 bg-gray-100 rounded-full h-2">
-                    <div class="h-2 rounded-full ${pct===100?'bg-green-500':pct>=60?'bg-yellow-400':'bg-red-400'}" style="width:${pct}%"></div>
+                  <div class="flex-1 bg-gray-100 rounded-full h-2 min-w-12">
+                    <div class="h-2 rounded-full transition-all ${pct===100?'bg-green-500':pct>=60?'bg-yellow-400':'bg-red-400'}" style="width:${pct}%"></div>
                   </div>
-                  <span class="text-xs font-bold ${pct===100?'text-green-600':pct>=60?'text-yellow-600':'text-red-500'}">${pct}%</span>
+                  <span class="text-xs font-bold ${pct===100?'text-green-600':pct>=60?'text-yellow-600':'text-red-500'} w-8">${pct}%</span>
                 </div>
+              </td>
+              <td class="px-4 py-2 text-center">
+                <button onclick="navigateToManageKyc_owner(${o.id},'${o.name}','${o.unit_no}')"
+                  class="btn-primary btn-sm"><i class="fas fa-edit mr-1"></i>Manage</button>
               </td>
             </tr>`
           }).join('')}
@@ -1586,44 +2008,51 @@ async function loadKycTracker() {
     </div>
   </div>
 
+  <!-- Tenants Tab -->
   <div id="kycTabTenants" class="card overflow-hidden hidden">
-    <div class="p-4 bg-gray-50 border-b">
-      <input type="text" placeholder="Search tenant..." class="form-input w-64" oninput="filterKycTable('tenants', this.value)"/>
-    </div>
     <div class="overflow-x-auto">
       <table class="w-full text-sm">
         <thead class="bg-gray-50">
           <tr>
-            <th class="px-4 py-3 text-left font-semibold">Unit</th>
-            <th class="px-4 py-3 text-left font-semibold">Tenant</th>
-            <th class="px-4 py-3 text-center">Contract</th>
-            <th class="px-4 py-3 text-center">Aadhar</th>
-            <th class="px-4 py-3 text-center">PAN</th>
-            <th class="px-4 py-3 text-center">Photo</th>
-            <th class="px-4 py-3 text-center">Police Verif.</th>
-            <th class="px-4 py-3 text-left">Expiry</th>
-            <th class="px-4 py-3 text-center">Completion</th>
+            <th class="px-4 py-3 text-left font-semibold text-gray-600">Unit</th>
+            <th class="px-4 py-3 text-left font-semibold text-gray-600">Tenant</th>
+            <th class="px-4 py-3 text-center font-semibold text-gray-600">Contract</th>
+            <th class="px-4 py-3 text-center font-semibold text-gray-600">Aadhar</th>
+            <th class="px-4 py-3 text-center font-semibold text-gray-600">PAN</th>
+            <th class="px-4 py-3 text-center font-semibold text-gray-600">Photo</th>
+            <th class="px-4 py-3 text-center font-semibold text-gray-600">Police Verif.</th>
+            <th class="px-4 py-3 text-left font-semibold text-gray-600">Tenancy Expiry</th>
+            <th class="px-4 py-3 text-center font-semibold text-gray-600">Completion</th>
+            <th class="px-4 py-3 text-center font-semibold text-gray-600">Action</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="kycTenantsBody">
           ${tenants.map(t => {
-            const done = [t.has_contract,t.has_aadhar,t.has_pan,t.has_photo,t.has_police].filter(Boolean).length
+            const vals = [t.has_contract, t.has_aadhar, t.has_pan, t.has_photo, t.has_police]
+            const done = vals.filter(Boolean).length
             const pct = Math.round(done/5*100)
             const exp = t.tenancy_expiry
-            const expDate = exp ? new Date(exp) : null
-            const isExpired = expDate && expDate < new Date()
+            const isExpired = exp && new Date(exp) < new Date()
             return `<tr class="table-row border-t">
               <td class="px-4 py-2 font-bold text-blue-900">Unit ${t.unit_no}</td>
-              <td class="px-4 py-2">${t.name}</td>
-              ${[t.has_contract,t.has_aadhar,t.has_pan,t.has_photo,t.has_police].map(v => `<td class="px-4 py-2 text-center">${v ? '<i class="fas fa-check-circle text-green-500"></i>' : '<i class="fas fa-times-circle text-red-400"></i>'}</td>`).join('')}
-              <td class="px-4 py-2 ${isExpired?'text-red-600 font-semibold':'text-gray-500'} text-xs">${exp ? formatDate(exp) : '—'}</td>
-              <td class="px-4 py-2 text-center">
-                <div class="flex items-center gap-1">
-                  <div class="flex-1 bg-gray-100 rounded-full h-2 w-16">
+              <td class="px-4 py-2 font-medium">${t.name}</td>
+              ${vals.map(v => `<td class="px-4 py-2 text-center">${v
+                ? '<i class="fas fa-check-circle text-green-500 text-base"></i>'
+                : '<i class="fas fa-times-circle text-red-400 text-base"></i>'}</td>`).join('')}
+              <td class="px-4 py-2 ${isExpired?'text-red-600 font-semibold':'text-gray-500'} text-xs">
+                ${exp ? (isExpired ? '<i class="fas fa-exclamation-triangle mr-1 text-red-500"></i>' : '') + formatDate(exp) : '—'}
+              </td>
+              <td class="px-4 py-2">
+                <div class="flex items-center gap-2">
+                  <div class="flex-1 bg-gray-100 rounded-full h-2 min-w-12">
                     <div class="h-2 rounded-full ${pct===100?'bg-green-500':pct>=60?'bg-yellow-400':'bg-red-400'}" style="width:${pct}%"></div>
                   </div>
-                  <span class="text-xs font-bold">${pct}%</span>
+                  <span class="text-xs font-bold ${pct===100?'text-green-600':pct>=60?'text-yellow-600':'text-red-500'} w-8">${pct}%</span>
                 </div>
+              </td>
+              <td class="px-4 py-2 text-center">
+                <button onclick="navigateToManageKyc_tenant(${t.id},'${t.name}','${t.unit_no}')"
+                  class="btn-secondary btn-sm"><i class="fas fa-edit mr-1"></i>Manage</button>
               </td>
             </tr>`
           }).join('')}
@@ -1631,21 +2060,53 @@ async function loadKycTracker() {
       </table>
     </div>
   </div>`
+
+  // Default: show first tab as active
+  showKycTab('owners')
+}
+
+// Navigate from KYC Tracker → Manage KYC for a specific owner
+async function navigateToManageKyc_owner(customerId, ownerName, unitNo) {
+  window._kycManageActiveTab = 'owner'
+  // Load unit to check for tenant
+  const unitR = await api('GET', `/units/${unitNo}`)
+  const tenant = unitR?.data?.tenant
+  await openManageKyc('customer', customerId, ownerName, unitNo,
+    tenant ? 'tenant' : null,
+    tenant?.id || null,
+    tenant?.name || null
+  )
+}
+
+// Navigate from KYC Tracker → Manage KYC opening on the Tenant tab
+async function navigateToManageKyc_tenant(tenantId, tenantName, unitNo) {
+  window._kycManageActiveTab = 'tenant'
+  // Load unit to get owner info
+  const unitR = await api('GET', `/units/${unitNo}`)
+  const owner = unitR?.data?.owner
+  await openManageKyc(
+    'customer', owner?.id, owner?.name || 'Owner', unitNo,
+    'tenant', tenantId, tenantName
+  )
 }
 
 function showKycTab(tab) {
-  document.getElementById('kycTabOwners').classList.toggle('hidden', tab !== 'owners')
-  document.getElementById('kycTabTenants').classList.toggle('hidden', tab !== 'tenants')
-  document.getElementById('tab-owners').className = tab === 'owners' ? 'btn-primary btn-sm' : 'px-3 py-1 rounded-md text-sm bg-gray-200 text-gray-700'
-  document.getElementById('tab-tenants').className = tab === 'tenants' ? 'btn-primary btn-sm' : 'px-3 py-1 rounded-md text-sm bg-gray-200 text-gray-700'
+  document.getElementById('kycTabOwners')?.classList.toggle('hidden', tab !== 'owners')
+  document.getElementById('kycTabTenants')?.classList.toggle('hidden', tab !== 'tenants')
+  const o = document.getElementById('tab-owners')
+  const t = document.getElementById('tab-tenants')
+  if (o) o.className = `px-5 py-3 text-sm font-semibold border-b-2 -mb-px ${tab==='owners' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`
+  if (t) t.className = `px-5 py-3 text-sm font-semibold border-b-2 -mb-px ${tab==='tenants' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`
 }
 
 function filterKycTable(type, val) {
-  const bodyId = type === 'owners' ? 'kycOwnersBody' : null
-  const tbody = document.querySelector(type === 'tenants' ? '#kycTabTenants tbody' : '#kycOwnersBody')
-  if (!tbody) return
-  tbody.querySelectorAll('tr').forEach(row => {
-    row.style.display = !val || row.textContent.toLowerCase().includes(val.toLowerCase()) ? '' : 'none'
+  const lv = val.toLowerCase()
+  ;['kycOwnersBody', 'kycTenantsBody'].forEach(id => {
+    const tbody = document.getElementById(id)
+    if (!tbody) return
+    tbody.querySelectorAll('tr').forEach(row => {
+      row.style.display = !val || row.textContent.toLowerCase().includes(lv) ? '' : 'none'
+    })
   })
 }
 
@@ -1901,6 +2362,9 @@ Object.assign(window, {
   showCustomerDetail, showEditCustomer, showAddCustomer, addCustomer, updateCustomer, deleteCustomer,
   showAddTenant, addTenant, searchCustomers,
   uploadKyc, submitKyc, showKycTab, filterKycTable,
+  openManageKyc, openKycUploadModal, submitKycFromModal,
+  switchKycManageTab, toggleDocHistory, viewDocumentImage,
+  navigateToManageKyc_owner, navigateToManageKyc_tenant,
   showAddEmployee, addEmployee, showEditEmployee, updateEmployee, showEmpDetails, showResetEmpPwd, resetEmpPwd,
   showModal, closeModal, loadKycTracker
 })

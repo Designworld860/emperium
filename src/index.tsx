@@ -119,6 +119,11 @@ function getHTML(): string {
     .complaint-resolved { border-left-color:#10b981; }
     input[type=file] { font-size:13px; }
     .photo-preview { width:80px; height:80px; object-fit:cover; border-radius:8px; border:1px solid #e2e8f0; cursor:pointer; }
+    .kyc-version-badge { display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;font-size:10px;font-weight:700; }
+    .kyc-doc-card { border-radius:12px; border:1px solid #e2e8f0; overflow:hidden; transition: box-shadow 0.2s; }
+    .kyc-doc-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+    .kyc-history-item { border-top:1px solid #e2e8f0; padding:12px 16px; display:flex; gap:12px; }
+    .kyc-history-item:hover { background:#f8fafc; }
     .sidebar-logo { padding:20px 16px 10px; border-bottom:1px solid rgba(255,255,255,0.1); margin-bottom:8px; }
     .notification-dot { width:8px; height:8px; background:#ef4444; border-radius:50%; position:absolute; top:4px; right:4px; }
   </style>
