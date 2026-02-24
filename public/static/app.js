@@ -130,54 +130,127 @@ function showLogin() {
 
 function renderLoginPage() {
   return `
-  <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 to-blue-700">
-    <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
-      <div class="text-center mb-6">
-        <div class="w-16 h-16 bg-blue-900 rounded-full flex items-center justify-center mx-auto mb-4">
-          <i class="fas fa-building text-yellow-400 text-2xl"></i>
+  <div style="min-height:100vh;display:flex;background:#F5EDEB;">
+
+    <!-- LEFT BRANDING PANEL -->
+    <div style="flex:1;background:linear-gradient(160deg,#1A0505 0%,#2D0808 35%,#4A1010 70%,#3D0E0E 100%);
+      display:none;flex-direction:column;justify-content:center;align-items:center;
+      padding:48px 40px;position:relative;overflow:hidden;" class="hidden lg:flex">
+      <!-- Decorative glows -->
+      <div style="position:absolute;top:-60px;right:-60px;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,rgba(232,67,26,0.15),transparent 70%);"></div>
+      <div style="position:absolute;bottom:-80px;left:-40px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(201,133,58,0.1),transparent 70%);"></div>
+      <div style="position:absolute;top:60%;right:10%;width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,0.03);"></div>
+
+      <!-- Logo -->
+      <div style="position:relative;z-index:2;text-align:center;">
+        <img src="/static/emperium-logo.png" alt="Emperium City" style="width:180px;display:block;margin:0 auto 24px;filter:drop-shadow(0 8px 24px rgba(232,67,26,0.4))"/>
+        <h1 style="color:white;font-size:26px;font-weight:800;margin-bottom:10px;">Grievance Redressal System</h1>
+        <p style="color:rgba(255,255,255,0.45);font-size:13.5px;line-height:1.7;max-width:320px;margin:0 auto;">
+          Streamlined complaint management for Emperium City residents &amp; facility staff.
+        </p>
+
+        <!-- Stats row -->
+        <div style="display:flex;gap:32px;margin-top:40px;justify-content:center;">
+          ${[['213','Total Units'],['5','Departments'],['24/7','Support'],['Fast','Resolution']].map(([num,lbl])=>`
+          <div style="text-align:center;">
+            <div style="font-size:22px;font-weight:800;color:#E8431A;">${num}</div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.35);margin-top:4px;">${lbl}</div>
+          </div>`).join('')}
         </div>
-        <h1 class="text-2xl font-bold text-gray-800">Emperium City</h1>
-        <p class="text-gray-500 text-sm mt-1">Grievance Redressal System</p>
+
+        <!-- Feature pills -->
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:32px;justify-content:center;">
+          ${[['fa-bolt','Real-time Tracking'],['fa-shield-alt','Secure Portal'],['fa-calendar-check','Visit Scheduling'],['fa-car','Vehicle Registry']].map(([ic,lbl])=>`
+          <div style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:6px 14px;font-size:12px;color:rgba(255,255,255,0.6);display:flex;align-items:center;gap:6px;">
+            <i class="fas ${ic}" style="color:#E8431A;"></i>${lbl}
+          </div>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT LOGIN PANEL -->
+    <div style="width:min(100%,460px);min-height:100vh;background:white;display:flex;flex-direction:column;
+      justify-content:center;align-items:center;padding:40px 36px;
+      box-shadow:-4px 0 40px rgba(0,0,0,0.08);">
+
+      <!-- Mobile logo (shown on small screens) -->
+      <div class="lg:hidden" style="text-align:center;margin-bottom:28px;">
+        <img src="/static/emperium-logo.png" alt="Emperium" style="width:120px;margin:0 auto 8px;display:block;"/>
+        <p style="font-size:11px;color:#9CA3AF;letter-spacing:0.08em;text-transform:uppercase;font-weight:700;">Grievance Redressal System</p>
       </div>
 
-      <div class="flex bg-gray-100 rounded-xl p-1 mb-6">
-        <button id="tabCust" onclick="switchLoginTab('customer')"
-          class="flex-1 py-2 rounded-lg text-sm font-semibold transition-all bg-blue-900 text-white">
-          <i class="fas fa-user mr-1"></i> Resident
-        </button>
-        <button id="tabEmp" onclick="switchLoginTab('employee')"
-          class="flex-1 py-2 rounded-lg text-sm font-semibold transition-all text-gray-600">
-          <i class="fas fa-user-tie mr-1"></i> Staff
-        </button>
-      </div>
-
-      <div id="loginType" class="hidden">customer</div>
-
-      <form onsubmit="doLogin(event)" class="space-y-4">
-        <div>
-          <label class="form-label">Email Address</label>
-          <input id="loginEmail" type="email" class="form-input" placeholder="Enter your email" required/>
+      <div style="width:100%;max-width:360px;">
+        <!-- Header -->
+        <div style="margin-bottom:28px;">
+          <h2 style="font-size:24px;font-weight:800;color:#111827;margin-bottom:6px;">Welcome back</h2>
+          <p style="color:#9CA3AF;font-size:13.5px;">Sign in to access your GRS portal</p>
         </div>
-        <div>
-          <label class="form-label">Password</label>
-          <div class="relative">
-            <input id="loginPwd" type="password" class="form-input pr-10" placeholder="Enter password" required/>
-            <button type="button" onclick="togglePwd()" class="absolute right-3 top-2 text-gray-400">
-              <i class="fas fa-eye" id="pwdIcon"></i>
-            </button>
+
+        <!-- Tab switcher -->
+        <div style="display:flex;background:#F5EDEB;border-radius:12px;padding:4px;margin-bottom:24px;gap:4px;">
+          <button id="tabCust" onclick="switchLoginTab('customer')"
+            style="flex:1;padding:9px 16px;border-radius:9px;border:none;font-size:13px;font-weight:600;
+            cursor:pointer;transition:all 0.2s;background:linear-gradient(135deg,#E8431A,#8B1A1A);color:white;
+            box-shadow:0 2px 8px rgba(232,67,26,0.32);">
+            <i class="fas fa-user" style="margin-right:6px;"></i>Resident
+          </button>
+          <button id="tabEmp" onclick="switchLoginTab('employee')"
+            style="flex:1;padding:9px 16px;border-radius:9px;border:none;font-size:13px;font-weight:600;
+            cursor:pointer;transition:all 0.2s;background:transparent;color:#6B7280;">
+            <i class="fas fa-user-tie" style="margin-right:6px;"></i>Staff
+          </button>
+        </div>
+
+        <div id="loginType" style="display:none;">customer</div>
+
+        <!-- Login form -->
+        <form onsubmit="doLogin(event)">
+          <div style="margin-bottom:16px;">
+            <label class="form-label">Email Address</label>
+            <div style="position:relative;">
+              <i class="fas fa-envelope" style="position:absolute;left:13px;top:50%;transform:translateY(-50%);color:#C4B5B0;font-size:13px;"></i>
+              <input id="loginEmail" type="email" autocomplete="email" class="form-input"
+                style="padding-left:38px;" placeholder="your@email.com" required/>
+            </div>
           </div>
-        </div>
-        <button type="submit" class="btn-primary w-full py-3 text-center rounded-xl">
-          <i class="fas fa-sign-in-alt mr-2"></i>Sign In
-        </button>
-      </form>
+          <div style="margin-bottom:22px;">
+            <label class="form-label">Password</label>
+            <div style="position:relative;">
+              <i class="fas fa-lock" style="position:absolute;left:13px;top:50%;transform:translateY(-50%);color:#C4B5B0;font-size:13px;"></i>
+              <input id="loginPwd" type="password" autocomplete="current-password" class="form-input"
+                style="padding-left:38px;padding-right:42px;" placeholder="Enter password" required/>
+              <button type="button" onclick="togglePwd()" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#C4B5B0;font-size:14px;">
+                <i class="fas fa-eye" id="pwdIcon"></i>
+              </button>
+            </div>
+          </div>
+          <button type="submit" class="btn-primary" style="width:100%;justify-content:center;padding:11px;font-size:14px;border-radius:11px;">
+            <i class="fas fa-sign-in-alt"></i>Sign In
+          </button>
+        </form>
 
-      <div class="mt-6 p-4 bg-blue-50 rounded-xl text-xs text-gray-600">
-        <p class="font-semibold mb-2">Demo Credentials:</p>
-        <p><strong>Admin:</strong> admin@emperiumcity.com / Admin@123</p>
-        <p><strong>Sub-Admin:</strong> subadmin@emperiumcity.com / SubAdmin@123</p>
-        <p><strong>Employee:</strong> rajesh@emperiumcity.com / Emp@123</p>
-        <p><strong>Resident:</strong> kapoorminakshi124@gmail.com / Customer@123</p>
+        <!-- Demo credentials -->
+        <div style="margin-top:24px;background:#FFF5F2;border:1px solid #FDDDD4;border-radius:12px;padding:14px 16px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <div style="width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#E8431A,#8B1A1A);display:flex;align-items:center;justify-content:center;">
+              <i class="fas fa-info" style="color:white;font-size:10px;"></i>
+            </div>
+            <span style="font-weight:700;font-size:12px;color:#8B1A1A;">Demo Credentials</span>
+          </div>
+          <div style="display:grid;gap:6px;">
+            ${[['Admin','admin@emperiumcity.com','Admin@123'],['Sub-Admin','subadmin@emperiumcity.com','SubAdmin@123'],['Employee','rajesh@emperiumcity.com','Emp@123'],['Resident','kapoorminakshi124@gmail.com','Customer@123']].map(([role,email,pwd])=>`
+            <div onclick="document.getElementById('loginEmail').value='${email}';document.getElementById('loginPwd').value='${pwd}';" style="cursor:pointer;display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:7px;transition:background 0.15s;" onmouseover="this.style.background='rgba(232,67,26,0.06)'" onmouseout="this.style.background='transparent'">
+              <span style="font-size:10px;font-weight:700;color:#E8431A;background:#FEE2D5;border-radius:4px;padding:2px 6px;min-width:60px;text-align:center;">${role}</span>
+              <span style="font-size:11.5px;color:#4B5563;font-family:monospace;">${email}</span>
+            </div>`).join('')}
+          </div>
+          <p style="font-size:10.5px;color:#9CA3AF;margin-top:8px;text-align:center;">Click any row to auto-fill credentials</p>
+        </div>
+
+        <!-- Footer -->
+        <p style="text-align:center;font-size:11px;color:#C4B5B0;margin-top:20px;">
+          &copy; 2026 Emperium City &bull; GRS Portal v2.0
+        </p>
       </div>
     </div>
   </div>`
@@ -186,8 +259,10 @@ function renderLoginPage() {
 function switchLoginTab(type) {
   document.getElementById('loginType').textContent = type
   const isCust = type === 'customer'
-  document.getElementById('tabCust').className = `flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${isCust ? 'bg-blue-900 text-white' : 'text-gray-600'}`
-  document.getElementById('tabEmp').className = `flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${!isCust ? 'bg-blue-900 text-white' : 'text-gray-600'}`
+  const activeStyle = 'background:linear-gradient(135deg,#E8431A,#8B1A1A);color:white;box-shadow:0 2px 8px rgba(232,67,26,0.32);'
+  const inactiveStyle = 'background:transparent;color:#6B7280;box-shadow:none;'
+  document.getElementById('tabCust').style.cssText = document.getElementById('tabCust').style.cssText.replace(/background:[^;]+;|color:[^;]+;|box-shadow:[^;]+;/g,'') + (isCust ? activeStyle : inactiveStyle)
+  document.getElementById('tabEmp').style.cssText = document.getElementById('tabEmp').style.cssText.replace(/background:[^;]+;|color:[^;]+;|box-shadow:[^;]+;/g,'') + (!isCust ? activeStyle : inactiveStyle)
 }
 
 function togglePwd() {
@@ -227,73 +302,88 @@ function showApp() {
   const isAdmin = currentUser.role === 'admin'
   const isSubAdmin = currentUser.role === 'sub_admin'
   const isCust = currentUser.type === 'customer'
+  const isStaff = isAdmin || isSubAdmin || isEmp
+
+  const roleLabel = isAdmin ? 'Administrator' : isSubAdmin ? 'Sub Administrator' : isEmp ? 'Employee' : `Unit ${currentUser.unit_no}`
+  const userInitial = (currentUser.name || 'U').charAt(0).toUpperCase()
 
   document.getElementById('app').innerHTML = `
-  <div class="flex h-screen overflow-hidden">
-    <!-- Sidebar -->
-    <aside class="sidebar w-64 flex-shrink-0 flex flex-col" id="sidebar">
+  <div class="app-shell">
+    <!-- ═══ SIDEBAR ══════════════════════════════════════════ -->
+    <aside class="sidebar" id="sidebar">
+      <!-- Logo -->
       <div class="sidebar-logo">
-        <div class="flex items-center gap-2">
-          <div class="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center">
-            <i class="fas fa-building text-blue-900 text-lg"></i>
-          </div>
-          <div>
-            <div class="text-white font-bold text-sm">Emperium City</div>
-            <div class="text-blue-300 text-xs">GRS Portal</div>
-          </div>
-        </div>
+        <img src="/static/emperium-logo.png" alt="Emperium City" style="width:150px;margin:0 auto 10px;display:block;filter:brightness(1.05)"/>
+        <div class="grs-label">Grievance Redressal System</div>
       </div>
 
-      <nav class="flex-1 px-3 space-y-1 overflow-y-auto py-2">
-        ${navItem('dashboard','Dashboard','fa-tachometer-alt')}
-        ${navItem('complaints','Complaints','fa-exclamation-circle')}
-        ${isEmp ? navItem('units','Unit Registry','fa-home') : ''}
-        ${isEmp ? navItem('customers','Customer Master','fa-users') : ''}
-        ${isEmp ? navItem('kyc-tracker','KYC Tracker','fa-id-card') : ''}
-        ${(isAdmin || isSubAdmin) ? navItem('employees','Employees','fa-user-tie') : ''}
-        ${navItem('notifications','Notifications','fa-bell')}
-        ${(isAdmin || isSubAdmin) ? navItem('audit','Audit Trail','fa-history') : ''}
+      <!-- Navigation -->
+      <nav class="sidebar-nav" id="mainNav">
+
+        <!-- MAIN SECTION -->
+        <div class="nav-section-label">Main</div>
+        ${navItem('dashboard', 'Dashboard', 'fa-tachometer-alt')}
+        ${navItem('complaints', 'Complaints', 'fa-exclamation-circle')}
+
+        ${isStaff ? `<div class="nav-section-label" style="margin-top:4px;">Management</div>` : ''}
+        ${isStaff ? navItem('units', 'Unit Registry', 'fa-building') : ''}
+        ${isStaff ? navItem('customers', 'Customer Master', 'fa-users') : ''}
+        ${isStaff ? navItem('kyc-tracker', 'KYC Tracker', 'fa-id-card') : ''}
+        ${(isAdmin || isSubAdmin) ? navItem('employees', 'Employees', 'fa-user-tie') : ''}
+        ${isStaff ? navItem('vehicles', 'Vehicle Registry', 'fa-car') : ''}
+
+        ${isStaff ? `<div class="nav-section-label" style="margin-top:4px;">Scheduling</div>` : ''}
+        ${isStaff ? navItem('calendar', 'My Calendar', 'fa-calendar-alt') : ''}
+        ${isStaff ? navItem('leave-mgmt', 'Leave Management', 'fa-umbrella-beach') : ''}
+
+        <div class="nav-section-label" style="margin-top:4px;">System</div>
+        ${navItem('complaints-master', 'Complaints Master', 'fa-layer-group')}
+        ${navItem('notifications', 'Notifications', 'fa-bell')}
+        ${(isAdmin || isSubAdmin) ? navItem('audit', 'Audit Trail', 'fa-history') : ''}
       </nav>
 
-      <div class="border-t border-blue-800 p-3">
-        <div class="flex items-center gap-3 p-2 rounded-lg bg-blue-800">
-          <div class="w-8 h-8 bg-yellow-400 rounded-full flex items-center justify-center text-blue-900 font-bold text-sm">
-            ${(currentUser.name || 'U').charAt(0).toUpperCase()}
+      <!-- User panel -->
+      <div class="sidebar-user">
+        <div class="user-card">
+          <div class="user-avatar">${userInitial}</div>
+          <div style="flex:1;min-width:0;">
+            <div class="user-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${currentUser.name}</div>
+            <div class="user-role">${roleLabel}</div>
           </div>
-          <div class="flex-1 min-w-0">
-            <div class="text-white text-xs font-semibold truncate">${currentUser.name}</div>
-            <div class="text-blue-300 text-xs truncate">${currentUser.role || currentUser.type}</div>
-          </div>
-          <button onclick="logout()" class="text-blue-300 hover:text-white" title="Logout">
+          <button onclick="logout()" class="logout-btn" title="Sign Out">
             <i class="fas fa-sign-out-alt"></i>
           </button>
         </div>
-        ${isCust ? `<div class="text-blue-300 text-xs mt-2 text-center">Unit ${currentUser.unit_no}</div>` : ''}
       </div>
     </aside>
 
-    <!-- Main content -->
-    <main class="flex-1 overflow-y-auto flex flex-col">
+    <!-- ═══ MAIN AREA ═════════════════════════════════════════ -->
+    <div class="main-area">
       <!-- Top bar -->
-      <header class="bg-white border-b px-6 py-3 flex items-center gap-4 sticky top-0 z-10">
-        <div class="flex-1 relative">
-          <input type="text" id="globalSearch" placeholder="Search units, residents, complaints..."
-            class="form-input pl-10 max-w-md" oninput="onSearch(this.value)"/>
-          <i class="fas fa-search absolute left-3 top-2.5 text-gray-400"></i>
-          <div id="searchDropdown" class="hidden absolute top-full mt-1 bg-white border rounded-xl shadow-lg w-full max-w-md z-50 max-h-72 overflow-y-auto"></div>
+      <header class="topbar">
+        <div class="topbar-search">
+          <i class="fas fa-search search-icon"></i>
+          <input type="text" id="globalSearch"
+            placeholder="Search units, residents, complaints..."
+            oninput="onSearch(this.value)"/>
+          <div id="searchDropdown" class="hidden"></div>
         </div>
-        <button onclick="navigate('notifications')" class="relative text-gray-500 hover:text-blue-900 text-lg p-2">
-          <i class="fas fa-bell"></i>
-          <span id="notifBadge" class="hidden notification-dot"></span>
-        </button>
-        <div class="text-sm text-gray-500">${dayjs().format('ddd, D MMM YYYY')}</div>
+        <div class="topbar-right">
+          <div class="topbar-date">
+            <i class="fas fa-calendar mr-1.5" style="color:#E8431A"></i>${dayjs().format('ddd, D MMM YYYY')}
+          </div>
+          <button onclick="navigate('notifications')" class="notif-btn" title="Notifications">
+            <i class="fas fa-bell"></i>
+            <span id="notifBadge" class="notif-dot hidden"></span>
+          </button>
+        </div>
       </header>
 
       <!-- Page content -->
-      <div class="flex-1 p-6" id="pageContent">
-        <div class="loading"><div class="spinner"></div></div>
+      <div class="page-wrap" id="pageContent">
+        <div class="loading"><div class="spinner"></div><span class="loading-text">Loading…</span></div>
       </div>
-    </main>
+    </div>
   </div>`
 
   navigate('dashboard')
@@ -301,14 +391,13 @@ function showApp() {
 }
 
 function navItem(page, label, icon) {
-  return `<a href="#" onclick="navigate('${page}'); return false;" id="nav-${page}"
-    class="flex items-center px-3 py-2 rounded-lg text-sm font-medium">
-    <i class="fas ${icon} nav-icon"></i>${label}
+  return `<a href="#" onclick="navigate('${page}'); return false;" id="nav-${page}" class="nav-item">
+    <i class="fas ${icon} nav-icon"></i><span>${label}</span>
   </a>`
 }
 
 function setActiveNav(page) {
-  document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'))
+  document.querySelectorAll('#mainNav .nav-item').forEach(a => a.classList.remove('active'))
   const el = document.getElementById('nav-' + page)
   if (el) el.classList.add('active')
 }
@@ -329,6 +418,10 @@ function navigate(page, params = {}) {
     employees: loadEmployees,
     notifications: loadNotifications,
     audit: loadAudit,
+    calendar: loadCalendar,
+    'leave-mgmt': loadLeaveManagement,
+    vehicles: loadVehicles,
+    'complaints-master': loadComplaintsMaster,
     'kyc-manage': (p) => {
       if (p && p.ownerEntityType) {
         openManageKyc(p.ownerEntityType, p.ownerEntityId, p.ownerName, p.unitNo, p.tenantEntityType, p.tenantEntityId, p.tenantName)
@@ -338,7 +431,7 @@ function navigate(page, params = {}) {
     }
   }
   if (pages[page]) pages[page](params)
-  else content.innerHTML = `<p class="text-gray-400 text-center mt-20">Page not found</p>`
+  else content.innerHTML = `<div class="empty-state"><i class="fas fa-map-signs"></i><p>Page not found</p></div>`
 }
 
 // ── Search ───────────────────────────────────────────────────
@@ -351,20 +444,18 @@ function onSearch(val) {
     if (!r?.ok) return
     const { units = [], complaints = [] } = r.data
     if (!units.length && !complaints.length) {
-      dd.innerHTML = `<div class="p-4 text-gray-400 text-sm text-center">No results found</div>`
+      dd.innerHTML = `<div style="padding:16px;text-align:center;color:#9CA3AF;font-size:13px;"><i class="fas fa-search" style="margin-right:6px;"></i>No results found</div>`
     } else {
       dd.innerHTML = `
-        ${units.length ? `<div class="px-4 py-2 text-xs font-bold text-gray-400 uppercase">Units</div>` : ''}
-        ${units.map(u => `<div class="px-4 py-2 hover:bg-blue-50 cursor-pointer border-b"
-            onclick="showUnitDetail('${u.unit_no}')">
-          <div class="font-semibold text-sm">Unit ${u.unit_no} – ${u.owner_name || 'N/A'}</div>
-          <div class="text-xs text-gray-400">${u.particulars} · ${u.tenant_name ? 'Tenant: ' + u.tenant_name : 'No tenant'}</div>
+        ${units.length ? `<div class="dd-section"><i class="fas fa-building" style="margin-right:5px;color:#E8431A"></i>Units</div>` : ''}
+        ${units.map(u => `<div class="dd-item" onclick="showUnitDetail('${u.unit_no}')">
+          <div style="font-weight:600;font-size:13px;color:#111827;">Unit ${u.unit_no} – ${u.owner_name || 'Vacant'}</div>
+          <div style="font-size:11.5px;color:#9CA3AF;margin-top:2px;">${u.particulars || ''} ${u.tenant_name ? '· Tenant: ' + u.tenant_name : ''}</div>
         </div>`).join('')}
-        ${complaints.length ? `<div class="px-4 py-2 text-xs font-bold text-gray-400 uppercase">Complaints</div>` : ''}
-        ${complaints.map(cp => `<div class="px-4 py-2 hover:bg-blue-50 cursor-pointer"
-            onclick="showComplaintDetail(${cp.id})">
-          <div class="font-semibold text-sm">${cp.complaint_no} – Unit ${cp.unit_no}</div>
-          <div class="text-xs text-gray-400">${cp.category_name} · ${cp.status}</div>
+        ${complaints.length ? `<div class="dd-section" style="margin-top:4px;"><i class="fas fa-exclamation-circle" style="margin-right:5px;color:#E8431A"></i>Complaints</div>` : ''}
+        ${complaints.map(cp => `<div class="dd-item" onclick="showComplaintDetail(${cp.id})">
+          <div style="font-weight:600;font-size:13px;color:#111827;">${cp.complaint_no} – Unit ${cp.unit_no}</div>
+          <div style="font-size:11.5px;color:#9CA3AF;margin-top:2px;">${cp.category_name} · ${cp.status}</div>
         </div>`).join('')}
       `
     }
@@ -400,22 +491,31 @@ async function loadNotifications() {
   const typeIcon = { info: 'info-circle text-blue-500', success: 'check-circle text-green-500', warning: 'exclamation-circle text-yellow-500', alert: 'bell text-red-500' }
 
   document.getElementById('pageContent').innerHTML = `
-  <div class="max-w-3xl mx-auto">
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-2xl font-bold text-gray-800"><i class="fas fa-bell mr-2 text-blue-900"></i>Notifications</h1>
-      ${unread_count > 0 ? `<button onclick="markAllRead()" class="btn-primary btn-sm"><i class="fas fa-check-double mr-1"></i>Mark All Read</button>` : ''}
+  <div style="max-width:720px;margin:0 auto;">
+    <div class="page-header">
+      <div class="page-title">
+        <div class="page-title-icon"><i class="fas fa-bell"></i></div>
+        <div>
+          <div>Notifications</div>
+          <div class="page-subtitle">${unread_count} unread notification${unread_count !== 1 ? 's' : ''}</div>
+        </div>
+      </div>
+      ${unread_count > 0 ? `<button onclick="markAllRead()" class="btn-outline btn-sm"><i class="fas fa-check-double"></i>Mark All Read</button>` : ''}
     </div>
-    <div class="space-y-3">
-      ${notifications.length === 0 ? `<div class="card p-12 text-center text-gray-400"><i class="fas fa-bell-slash text-4xl mb-3"></i><p>No notifications</p></div>` :
+    <div class="card" style="overflow:hidden;">
+      ${notifications.length === 0 ? `<div class="empty-state"><i class="fas fa-bell-slash"></i><p>You're all caught up — no notifications</p></div>` :
         notifications.map(n => `
-        <div class="card p-4 flex gap-4 ${n.is_read ? 'opacity-70' : 'border-l-4 border-blue-500'}">
-          <div class="text-xl mt-1"><i class="fas fa-${typeIcon[n.type] || typeIcon.info}"></i></div>
-          <div class="flex-1">
-            <div class="font-semibold text-gray-800 text-sm">${n.title}</div>
-            <div class="text-gray-600 text-sm mt-1">${n.message}</div>
-            <div class="text-gray-400 text-xs mt-2">${formatDateTime(n.created_at)}</div>
+        <div class="notif-item ${!n.is_read ? 'unread' : ''}" style="${!n.is_read ? 'border-left-color:var(--ec-flame);' : ''}">
+          <div style="width:36px;height:36px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+            background:${n.type==='success'?'#ECFDF5':n.type==='warning'||n.type==='alert'?'#FFF7ED':'#FFF0EC'};">
+            <i class="fas fa-${typeIcon[n.type]||typeIcon.info}" style="font-size:14px;"></i>
           </div>
-          ${n.complaint_id ? `<button onclick="showComplaintDetail(${n.complaint_id})" class="text-blue-500 text-sm hover:underline">View</button>` : ''}
+          <div style="flex:1;">
+            <div style="font-weight:600;font-size:13px;color:#111827;">${n.title}</div>
+            <div style="font-size:12.5px;color:#6B7280;margin-top:3px;">${n.message}</div>
+            <div style="font-size:11px;color:#9CA3AF;margin-top:5px;">${formatDateTime(n.created_at)}</div>
+          </div>
+          ${n.complaint_id ? `<button onclick="showComplaintDetail(${n.complaint_id})" class="btn-primary btn-xs">View</button>` : ''}
         </div>`).join('')}
     </div>
   </div>`
@@ -449,92 +549,118 @@ async function loadAdminDashboard() {
   const cnt = d.counts || {}
 
   document.getElementById('pageContent').innerHTML = `
-  <h1 class="text-2xl font-bold text-gray-800 mb-6"><i class="fas fa-tachometer-alt mr-2 text-blue-900"></i>Dashboard</h1>
-  
-  <!-- Stats Row 1 -->
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-    <div class="stat-card" style="background:linear-gradient(135deg,#1e3a5f,#2563eb)">
-      <div class="text-3xl font-bold">${us.total_units || 0}</div>
-      <div class="text-blue-200 text-sm mt-1">Total Units</div>
-      <div class="text-xs mt-2 text-blue-100">🟢 ${us.occupied || 0} Occupied · ⚪ ${us.vacant || 0} Vacant</div>
+  <!-- Page Header -->
+  <div class="page-header">
+    <div>
+      <div class="page-title">
+        <div class="page-title-icon"><i class="fas fa-tachometer-alt"></i></div>
+        <div>
+          <div>Admin Dashboard</div>
+          <div class="page-subtitle">Emperium City Grievance Redressal System</div>
+        </div>
+      </div>
     </div>
-    <div class="stat-card" style="background:linear-gradient(135deg,#065f46,#10b981)">
-      <div class="text-3xl font-bold">${cnt.customers || 0}</div>
-      <div class="text-green-100 text-sm mt-1">Registered Owners</div>
-      <div class="text-xs mt-2 text-green-100">${cnt.tenants || 0} Active Tenants</div>
+    <div class="page-actions">
+      <button onclick="navigate('complaints')" class="btn-primary"><i class="fas fa-plus"></i>New Complaint</button>
+      <button onclick="navigate('customers')" class="btn-ghost"><i class="fas fa-users"></i>Customers</button>
     </div>
-    <div class="stat-card" style="background:linear-gradient(135deg,#7c3aed,#a855f7)">
-      <div class="text-3xl font-bold">${cs.total || 0}</div>
-      <div class="text-purple-100 text-sm mt-1">Total Complaints</div>
-      <div class="text-xs mt-2 text-purple-100">🔴 ${cs.open_count || 0} Open</div>
+  </div>
+
+  <!-- KPI Row -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:20px;">
+    <div class="stat-card sc-flame">
+      <i class="fas fa-building stat-icon"></i>
+      <div class="stat-number">${us.total_units || 0}</div>
+      <div class="stat-label">Total Units</div>
+      <div class="stat-sub">${us.occupied || 0} Occupied &bull; ${us.vacant || 0} Vacant</div>
     </div>
-    <div class="stat-card" style="background:linear-gradient(135deg,#92400e,#f59e0b)">
-      <div class="text-3xl font-bold">${cnt.employees || 0}</div>
-      <div class="text-yellow-100 text-sm mt-1">Staff Members</div>
-      <div class="text-xs mt-2 text-yellow-100">${cnt.kyc_complete || 0} KYC Complete</div>
+    <div class="stat-card sc-green">
+      <i class="fas fa-users stat-icon"></i>
+      <div class="stat-number">${cnt.customers || 0}</div>
+      <div class="stat-label">Registered Owners</div>
+      <div class="stat-sub">${cnt.tenants || 0} Active Tenants</div>
+    </div>
+    <div class="stat-card sc-purple">
+      <i class="fas fa-exclamation-circle stat-icon"></i>
+      <div class="stat-number">${cs.total || 0}</div>
+      <div class="stat-label">Total Complaints</div>
+      <div class="stat-sub">${cs.open_count || 0} Open Now</div>
+    </div>
+    <div class="stat-card sc-gold">
+      <i class="fas fa-user-tie stat-icon"></i>
+      <div class="stat-number">${cnt.employees || 0}</div>
+      <div class="stat-label">Staff Members</div>
+      <div class="stat-sub">${cnt.kyc_complete || 0} KYC Complete</div>
     </div>
   </div>
 
   <!-- Complaint Pipeline -->
-  <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-    ${[['Open','open_count','#fef3c7','#92400e'],['Assigned','assigned_count','#dbeafe','#1e40af'],['Scheduled','scheduled_count','#e0e7ff','#5b21b6'],['Resolved','resolved_count','#d1fae5','#065f46'],['Closed','closed_count','#f3f4f6','#374151']].map(([label,key,bg,color]) => `
-    <div class="card p-4 text-center">
-      <div class="text-2xl font-bold" style="color:${color}">${cs[key] || 0}</div>
-      <div class="text-xs font-semibold mt-1" style="color:${color}">${label}</div>
-    </div>`).join('')}
+  <div class="card" style="margin-bottom:20px;">
+    <div class="card-header">
+      <span class="card-title"><i class="fas fa-stream" style="color:#E8431A;margin-right:8px;"></i>Complaint Pipeline</span>
+    </div>
+    <div class="card-body" style="padding:16px 20px;">
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;">
+        ${[['Open','open_count','#F59E0B','#FFF3E0'],['Assigned','assigned_count','#3B82F6','#EFF6FF'],['Scheduled','scheduled_count','#8B5CF6','#F5F3FF'],['Resolved','resolved_count','#10B981','#ECFDF5'],['Closed','closed_count','#6B7280','#F9FAFB']].map(([label,key,color,bg]) => `
+        <div style="text-align:center;padding:14px 8px;border-radius:12px;background:${bg};border:1.5px solid ${color}22;">
+          <div style="font-size:24px;font-weight:800;color:${color};">${cs[key] || 0}</div>
+          <div style="font-size:11px;font-weight:600;color:${color};margin-top:4px;">${label}</div>
+        </div>`).join('')}
+      </div>
+    </div>
   </div>
 
-  <div class="grid md:grid-cols-2 gap-6 mb-6">
+  <!-- Bottom Grid -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
     <!-- Recent Complaints -->
-    <div class="card p-5">
-      <div class="flex justify-between items-center mb-4">
-        <h3 class="font-bold text-gray-800">Recent Complaints</h3>
-        <button onclick="navigate('complaints')" class="text-blue-600 text-sm hover:underline">View All</button>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title"><i class="fas fa-clock" style="color:#E8431A;margin-right:8px;"></i>Recent Complaints</span>
+        <button onclick="navigate('complaints')" style="font-size:12px;color:#E8431A;background:none;border:none;cursor:pointer;font-weight:600;">View All &rarr;</button>
       </div>
-      <div class="space-y-2">
-        ${(d.recent_complaints || []).map(c => `
-        <div class="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer complaint-card complaint-${c.status.toLowerCase()}"
-             onclick="showComplaintDetail(${c.id})">
-          <div class="w-2 h-2 rounded-full ${c.status==='Open'?'bg-yellow-400':c.status==='Assigned'?'bg-blue-400':c.status==='Resolved'?'bg-green-400':'bg-gray-400'}"></div>
-          <div class="flex-1 min-w-0">
-            <div class="text-sm font-medium truncate">${c.complaint_no} – Unit ${c.unit_no}</div>
-            <div class="text-xs text-gray-400">${c.category_name} · ${formatDate(c.created_at)}</div>
+      <div style="padding:0;">
+        ${(d.recent_complaints || []).length === 0 ? `<div class="empty-state" style="padding:32px;"><i class="fas fa-inbox"></i><p>No complaints yet</p></div>` :
+          (d.recent_complaints || []).map(c => `
+        <div class="complaint-card complaint-${(c.status||'').toLowerCase()}" style="display:flex;align-items:center;gap:12px;padding:11px 18px;cursor:pointer;transition:background 0.15s;border-bottom:1px solid #F9F5F4;" onclick="showComplaintDetail(${c.id})" onmouseover="this.style.background='#FFF5F3'" onmouseout="this.style.background=''">
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:600;font-size:13px;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.complaint_no} &ndash; Unit ${c.unit_no}</div>
+            <div style="font-size:11.5px;color:#9CA3AF;margin-top:2px;">${c.category_name} &bull; ${formatDate(c.created_at)}</div>
           </div>
           ${statusBadge(c.status)}
         </div>`).join('')}
       </div>
     </div>
 
-    <!-- Category Breakdown + Workload -->
-    <div class="space-y-4">
-      <div class="card p-5">
-        <h3 class="font-bold text-gray-800 mb-3">Active by Category</h3>
-        ${(d.by_category || []).map(cat => `
-        <div class="flex items-center gap-3 mb-2">
-          <div class="text-sm w-32 truncate">${cat.name}</div>
-          <div class="flex-1 bg-gray-100 rounded-full h-2">
-            <div class="bg-blue-600 h-2 rounded-full" style="width:${Math.min(100, (cat.count / Math.max(1, cs.total || 1)) * 100)}%"></div>
-          </div>
-          <div class="text-sm font-bold text-blue-700 w-8">${cat.count}</div>
-        </div>`).join('')}
-        ${!(d.by_category?.length) ? '<p class="text-gray-400 text-sm">No active complaints</p>' : ''}
+    <!-- Category + Workload -->
+    <div style="display:flex;flex-direction:column;gap:16px;">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title"><i class="fas fa-chart-bar" style="color:#E8431A;margin-right:8px;"></i>Active by Category</span>
+        </div>
+        <div class="card-body">
+          ${(d.by_category || []).length === 0 ? `<p style="color:#9CA3AF;font-size:13px;">No active complaints</p>` :
+            (d.by_category || []).map(cat => `
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+            <div style="width:100px;font-size:12.5px;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${cat.name}</div>
+            <div class="progress-bar" style="flex:1;"><div class="progress-fill progress-brand" style="width:${Math.min(100,(cat.count/Math.max(1,cs.total||1))*100)}%"></div></div>
+            <div style="font-size:12px;font-weight:700;color:#E8431A;min-width:24px;text-align:right;">${cat.count}</div>
+          </div>`).join('')}
+        </div>
       </div>
-      <div class="card p-5">
-        <h3 class="font-bold text-gray-800 mb-3">Staff Workload</h3>
-        ${(d.employee_workload || []).map(e => `
-        <div class="flex items-center justify-between mb-2">
-          <div class="text-sm">${e.name}</div>
-          <div class="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-xs font-bold">${e.count} active</div>
-        </div>`).join('')}
-        ${!(d.employee_workload?.length) ? '<p class="text-gray-400 text-sm">All clear!</p>' : ''}
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title"><i class="fas fa-hard-hat" style="color:#E8431A;margin-right:8px;"></i>Staff Workload</span>
+        </div>
+        <div class="card-body">
+          ${(d.employee_workload || []).length === 0 ? `<p style="color:#9CA3AF;font-size:13px;">All staff available</p>` :
+            (d.employee_workload || []).map(e => `
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <div style="font-size:13px;color:#374151;">${e.name}</div>
+            <div style="padding:3px 10px;background:#FFF0EC;color:#E8431A;border-radius:20px;font-size:11px;font-weight:700;border:1px solid #FDDDD4;">${e.count} active</div>
+          </div>`).join('')}
+        </div>
       </div>
     </div>
-  </div>
-
-  <div class="flex gap-4 flex-wrap">
-    <button onclick="navigate('complaints')" class="btn-primary"><i class="fas fa-plus mr-2"></i>New Complaint</button>
-    <button onclick="navigate('customers')" class="btn-secondary"><i class="fas fa-users mr-2"></i>Customer Master</button>
-    <button onclick="navigate('kyc-tracker')" class="btn-secondary"><i class="fas fa-id-card mr-2"></i>KYC Tracker</button>
   </div>`
 }
 
@@ -545,33 +671,61 @@ async function loadEmployeeDashboard() {
   const stats = d.stats || {}
 
   document.getElementById('pageContent').innerHTML = `
-  <h1 class="text-2xl font-bold text-gray-800 mb-6"><i class="fas fa-hard-hat mr-2 text-blue-900"></i>My Dashboard</h1>
+  <div class="page-header">
+    <div class="page-title">
+      <div class="page-title-icon"><i class="fas fa-hard-hat"></i></div>
+      <div>
+        <div>My Dashboard</div>
+        <div class="page-subtitle">Welcome back, ${d.employee?.name || currentUser.name}</div>
+      </div>
+    </div>
+    <div class="page-actions">
+      <button onclick="navigate('calendar')" class="btn-outline"><i class="fas fa-calendar-alt"></i>My Calendar</button>
+      <button onclick="navigate('leave-mgmt')" class="btn-ghost"><i class="fas fa-umbrella-beach"></i>Apply Leave</button>
+    </div>
+  </div>
 
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-    ${[['Assigned to Me','total_assigned','#1e3a5f'],['Pending','pending','#f59e0b'],['Scheduled','scheduled','#8b5cf6'],['Resolved','resolved','#10b981']].map(([label,key,color]) => `
-    <div class="card p-4 text-center">
-      <div class="text-3xl font-bold" style="color:${color}">${stats[key] || 0}</div>
-      <div class="text-gray-500 text-sm mt-1">${label}</div>
+  <!-- Stats -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;">
+    ${[['Assigned to Me','total_assigned','sc-flame','fa-tasks'],['Pending','pending','sc-gold','fa-hourglass-half'],['Scheduled','scheduled','sc-purple','fa-calendar-check'],['Resolved','resolved','sc-green','fa-check-circle']].map(([label,key,cls,ic]) => `
+    <div class="stat-card ${cls}">
+      <i class="fas ${ic} stat-icon"></i>
+      <div class="stat-number">${stats[key] || 0}</div>
+      <div class="stat-label">${label}</div>
     </div>`).join('')}
   </div>
 
+  <!-- Today's Visits -->
   ${d.today_visits?.length ? `
-  <div class="card p-5 mb-6 border-l-4 border-purple-500">
-    <h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-calendar-day mr-2 text-purple-500"></i>Today's Visits (${d.today_visits.length})</h3>
-    ${d.today_visits.map(c => `
-    <div class="flex items-center justify-between p-3 bg-purple-50 rounded-lg mb-2">
-      <div>
-        <div class="font-semibold text-sm">${c.complaint_no} – Unit ${c.unit_no}</div>
-        <div class="text-xs text-gray-500">${c.category_name} · ${c.visit_time || 'Time TBD'}</div>
+  <div class="card" style="margin-bottom:20px;border-left:4px solid #8B5CF6;">
+    <div class="card-header">
+      <span class="card-title"><i class="fas fa-calendar-day" style="color:#8B5CF6;margin-right:8px;"></i>Today's Visits (${d.today_visits.length})</span>
+      <button onclick="navigate('calendar')" style="font-size:12px;color:#8B5CF6;background:none;border:none;cursor:pointer;font-weight:600;">Full Calendar &rarr;</button>
+    </div>
+    <div class="card-body" style="padding:12px 20px;">
+      <div style="display:grid;gap:8px;">
+        ${d.today_visits.map(c => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:#F5F3FF;border-radius:10px;border:1px solid #EDE9FE;">
+          <div>
+            <div style="font-weight:600;font-size:13px;">${c.complaint_no} &ndash; Unit ${c.unit_no}</div>
+            <div style="font-size:11.5px;color:#6B7280;margin-top:2px;">${c.category_name} &bull; ${c.visit_time || 'Time TBD'}</div>
+          </div>
+          <button onclick="showComplaintDetail(${c.id})" class="btn-primary btn-sm">View</button>
+        </div>`).join('')}
       </div>
-      <button onclick="showComplaintDetail(${c.id})" class="btn-primary btn-sm">View</button>
-    </div>`).join('')}
+    </div>
   </div>` : ''}
 
-  <div class="card p-5">
-    <h3 class="font-bold text-gray-800 mb-4">My Assigned Complaints</h3>
-    ${(d.assigned_complaints || []).length === 0 ? `<p class="text-gray-400 text-center py-8">No complaints assigned</p>` :
-      renderComplaintTable(d.assigned_complaints)}
+  <!-- Assigned Complaints -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title"><i class="fas fa-list-check" style="color:#E8431A;margin-right:8px;"></i>My Assigned Complaints</span>
+    </div>
+    <div style="padding:0;">
+      ${(d.assigned_complaints || []).length === 0
+        ? `<div class="empty-state"><i class="fas fa-check-double"></i><p>No complaints assigned — you\'re all caught up!</p></div>`
+        : renderComplaintTable(d.assigned_complaints)}
+    </div>
   </div>`
 }
 
@@ -588,39 +742,53 @@ async function loadCustomerDashboard() {
   const kycTotal = Object.keys(kyc).length
 
   document.getElementById('pageContent').innerHTML = `
-  <h1 class="text-2xl font-bold text-gray-800 mb-6"><i class="fas fa-home mr-2 text-blue-900"></i>My Dashboard</h1>
-
-  <div class="grid md:grid-cols-3 gap-4 mb-6">
-    <div class="card p-5 col-span-1">
-      <div class="flex items-center gap-4 mb-4">
-        <div class="w-14 h-14 bg-blue-900 rounded-full flex items-center justify-center text-white text-xl font-bold">
-          ${(cust.name || 'U').charAt(0)}
-        </div>
-        <div>
-          <div class="font-bold text-gray-800">${cust.name}</div>
-          <div class="text-blue-600 font-semibold">Unit ${cust.unit_no}</div>
-          <div class="text-xs text-gray-400">${cust.particulars}</div>
-        </div>
-      </div>
-      <div class="text-sm text-gray-600 space-y-1">
-        <div><i class="fas fa-envelope mr-2 text-gray-400"></i>${cust.email || '—'}</div>
-        <div><i class="fas fa-phone mr-2 text-gray-400"></i>${cust.mobile1 || '—'}</div>
-        <div><i class="fas fa-ruler-combined mr-2 text-gray-400"></i>${cust.billing_area} ${cust.area_unit}</div>
+  <div class="page-header">
+    <div class="page-title">
+      <div class="page-title-icon"><i class="fas fa-home"></i></div>
+      <div>
+        <div>My Dashboard</div>
+        <div class="page-subtitle">Unit ${cust.unit_no} &bull; ${cust.particulars}</div>
       </div>
     </div>
+    <button onclick="showRegisterComplaint()" class="btn-primary"><i class="fas fa-plus"></i>Register Complaint</button>
+  </div>
 
-    <div class="card p-5 col-span-2">
-      <h3 class="font-bold text-gray-800 mb-3">My Complaints Summary</h3>
-      <div class="grid grid-cols-3 gap-3 mb-4">
-        ${[['Total',stats.total,'#1e3a5f'],['Open',stats.open_count,'#f59e0b'],['Resolved',stats.resolved,'#10b981']].map(([label,val,color]) => `
-        <div class="text-center p-3 rounded-lg bg-gray-50">
-          <div class="text-2xl font-bold" style="color:${color}">${val || 0}</div>
-          <div class="text-xs text-gray-500">${label}</div>
+  <!-- Profile + Stats -->
+  <div style="display:grid;grid-template-columns:300px 1fr;gap:20px;margin-bottom:20px;">
+    <!-- Profile card -->
+    <div class="card">
+      <div style="background:linear-gradient(135deg,#E8431A,#8B1A1A);height:60px;border-radius:14px 14px 0 0;"></div>
+      <div style="padding:0 20px 20px;">
+        <div style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#E8431A,#8B1A1A);display:flex;align-items:center;justify-content:center;color:white;font-size:20px;font-weight:800;margin-top:-26px;border:3px solid white;">${(cust.name||'U').charAt(0)}</div>
+        <div style="font-size:16px;font-weight:700;color:#111827;margin-top:10px;">${cust.name}</div>
+        <div style="font-size:13px;color:#E8431A;font-weight:600;">Unit ${cust.unit_no}</div>
+        <hr style="margin:14px 0;border-color:#F3F4F6;">
+        <div style="display:grid;gap:8px;font-size:12.5px;">
+          <div style="display:flex;align-items:center;gap:8px;"><i class="fas fa-envelope" style="color:#C4B5B0;width:14px;"></i><span style="color:#4B5563;">${cust.email||'—'}</span></div>
+          <div style="display:flex;align-items:center;gap:8px;"><i class="fas fa-phone" style="color:#C4B5B0;width:14px;"></i><span style="color:#4B5563;">${cust.mobile1||'—'}</span></div>
+          <div style="display:flex;align-items:center;gap:8px;"><i class="fas fa-ruler" style="color:#C4B5B0;width:14px;"></i><span style="color:#4B5563;">${cust.billing_area||'—'} ${cust.area_unit||''}</span></div>
+        </div>
+      </div>
+    </div>
+    <!-- Stats -->
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+        ${[['Total Complaints','total','sc-flame','fa-exclamation-circle'],['Open','open_count','sc-gold','fa-clock'],['Resolved','resolved','sc-green','fa-check-circle']].map(([lbl,key,cls,ic])=>`
+        <div class="stat-card ${cls}">
+          <i class="fas ${ic} stat-icon"></i>
+          <div class="stat-number">${stats[key]||0}</div>
+          <div class="stat-label">${lbl}</div>
         </div>`).join('')}
       </div>
-      <button onclick="showRegisterComplaint()" class="btn-primary w-full">
-        <i class="fas fa-plus mr-2"></i>Register New Complaint
-      </button>
+      <div class="card" style="padding:16px 18px;">
+        <button onclick="showRegisterComplaint()" class="btn-primary" style="width:100%;justify-content:center;padding:12px;font-size:14px;">
+          <i class="fas fa-plus"></i>Register New Complaint
+        </button>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;">
+          <button onclick="navigate('complaints')" class="btn-ghost btn-sm" style="justify-content:center;"><i class="fas fa-list"></i>My Complaints</button>
+          <button onclick="navigate('notifications')" class="btn-ghost btn-sm" style="justify-content:center;"><i class="fas fa-bell"></i>Notifications</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -671,10 +839,16 @@ async function loadComplaints(params = {}) {
   const categories = catR?.data?.categories || []
 
   document.getElementById('pageContent').innerHTML = `
-  <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
-    <h1 class="text-2xl font-bold text-gray-800"><i class="fas fa-exclamation-circle mr-2 text-blue-900"></i>Complaints</h1>
-    <div class="flex gap-3 flex-wrap">
-      <select id="filterStatus" onchange="filterComplaints()" class="form-input w-40">
+  <div class="page-header">
+    <div class="page-title">
+      <div class="page-title-icon"><i class="fas fa-exclamation-circle"></i></div>
+      <div>
+        <div>Complaints</div>
+        <div class="page-subtitle">${complaints.length} complaint(s) loaded</div>
+      </div>
+    </div>
+    <div class="page-actions">
+      <select id="filterStatus" onchange="filterComplaints()" class="filter-select">
         <option value="">All Status</option>
         <option value="Open">Open</option>
         <option value="Assigned">Assigned</option>
@@ -682,13 +856,11 @@ async function loadComplaints(params = {}) {
         <option value="Resolved">Resolved</option>
         <option value="Closed">Closed</option>
       </select>
-      <select id="filterCat" onchange="filterComplaints()" class="form-input w-44">
+      <select id="filterCat" onchange="filterComplaints()" class="filter-select">
         <option value="">All Categories</option>
         ${categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
       </select>
-      <button onclick="showRegisterComplaint()" class="btn-primary">
-        <i class="fas fa-plus mr-1"></i>New Complaint
-      </button>
+      <button onclick="showRegisterComplaint()" class="btn-primary"><i class="fas fa-plus"></i>New Complaint</button>
     </div>
   </div>
 
@@ -796,49 +968,50 @@ async function showComplaintDetail(id) {
   }
 
   showModal(`
-  <div class="flex justify-between items-start mb-4">
+  <div class="modal-header">
     <div>
-      <h2 class="text-xl font-bold text-gray-800">${c.complaint_no}</h2>
-      <div class="flex items-center gap-2 mt-1">
+      <div class="modal-title">${c.complaint_no}</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
         ${statusBadge(c.status)}
-        <span class="${priorityColor(c.priority)} text-sm font-semibold">${c.priority} Priority</span>
+        <span style="font-size:12px;font-weight:700;" class="prio-${(c.priority||'normal').toLowerCase()}">${c.priority} Priority</span>
       </div>
     </div>
-    <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button>
+    <button onclick="closeModal()" class="modal-close"><i class="fas fa-times"></i></button>
   </div>
+  <div class="modal-body">
 
-  <div class="grid md:grid-cols-2 gap-4 mb-4">
-    <div class="bg-gray-50 rounded-lg p-3 space-y-1 text-sm">
-      <div><span class="text-gray-500">Unit:</span> <strong>Unit ${c.unit_no}</strong></div>
-      <div><span class="text-gray-500">Category:</span> <strong>${c.category_name}</strong></div>
-      <div><span class="text-gray-500">Resident:</span> ${c.customer_name || '—'}</div>
-      <div><span class="text-gray-500">Registered:</span> ${formatDateTime(c.created_at)}</div>
-      ${c.assigned_to_name ? `<div><span class="text-gray-500">Assigned To:</span> <strong>${c.assigned_to_name}</strong></div>` : ''}
-      ${c.visit_date ? `<div><span class="text-gray-500">Visit:</span> ${formatDate(c.visit_date)} ${c.visit_time || ''}</div>` : ''}
-      ${c.resolved_at ? `<div><span class="text-gray-500">Resolved:</span> ${formatDateTime(c.resolved_at)}</div>` : ''}
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
+    <div style="background:#F9FAFB;border-radius:10px;padding:14px;font-size:12.5px;display:grid;gap:7px;">
+      <div style="display:flex;gap:8px;"><span style="color:#9CA3AF;min-width:80px;">Unit</span><strong style="color:#111827;">Unit ${c.unit_no}</strong></div>
+      <div style="display:flex;gap:8px;"><span style="color:#9CA3AF;min-width:80px;">Category</span><strong style="color:#111827;">${c.category_name}${c.sub_category_name ? ' &rarr; '+c.sub_category_name : ''}</strong></div>
+      <div style="display:flex;gap:8px;"><span style="color:#9CA3AF;min-width:80px;">Resident</span><span style="color:#374151;">${c.customer_name||'&mdash;'}</span></div>
+      <div style="display:flex;gap:8px;"><span style="color:#9CA3AF;min-width:80px;">Registered</span><span style="color:#374151;">${formatDateTime(c.created_at)}</span></div>
+      ${c.assigned_to_name ? `<div style="display:flex;gap:8px;"><span style="color:#9CA3AF;min-width:80px;">Assigned To</span><strong style="color:#111827;">${c.assigned_to_name}</strong></div>` : ''}
+      ${c.visit_date ? `<div style="display:flex;gap:8px;"><span style="color:#9CA3AF;min-width:80px;">Visit Date</span><span style="color:#374151;">${formatDate(c.visit_date)} ${c.visit_time||''}</span></div>` : ''}
+      ${c.resolved_at ? `<div style="display:flex;gap:8px;"><span style="color:#9CA3AF;min-width:80px;">Resolved</span><span style="color:#374151;">${formatDateTime(c.resolved_at)}</span></div>` : ''}
     </div>
     <div>
-      <div class="text-sm font-semibold text-gray-700 mb-2">Description:</div>
-      <p class="text-gray-600 text-sm bg-gray-50 rounded-lg p-3">${c.description}</p>
-      ${c.photo_data ? `<img src="${c.photo_data}" class="photo-preview mt-2" onclick="window.open('${c.photo_data}')"/>` : ''}
+      <div style="font-weight:700;font-size:12px;color:#374151;margin-bottom:6px;">Description</div>
+      <p style="font-size:12.5px;color:#4B5563;background:#F9FAFB;border-radius:8px;padding:12px;line-height:1.6;">${c.description}</p>
+      ${c.photo_data ? `<img src="${c.photo_data}" class="photo-preview" style="margin-top:10px;" onclick="window.open('${c.photo_data}')"/>` : ''}
     </div>
   </div>
 
   ${c.resolution_notes ? `
-  <div class="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
-    <div class="font-semibold text-green-800 text-sm mb-1"><i class="fas fa-check-circle mr-1"></i>Resolution Notes</div>
-    <p class="text-green-700 text-sm">${c.resolution_notes}</p>
-    ${c.resolution_photo_data ? `<img src="${c.resolution_photo_data}" class="photo-preview mt-2" onclick="window.open('${c.resolution_photo_data}')"/>` : ''}
+  <div style="background:#ECFDF5;border:1px solid #A7F3D0;border-radius:10px;padding:14px;margin-bottom:14px;">
+    <div style="font-weight:700;color:#065F46;font-size:12.5px;margin-bottom:6px;"><i class="fas fa-check-circle" style="margin-right:6px;"></i>Resolution Notes</div>
+    <p style="font-size:12.5px;color:#047857;">${c.resolution_notes}</p>
+    ${c.resolution_photo_data ? `<img src="${c.resolution_photo_data}" class="photo-preview" style="margin-top:8px;" onclick="window.open('${c.resolution_photo_data}')"/>` : ''}
   </div>` : ''}
 
   <!-- Actions -->
-  <div class="space-y-3">
+  <div style="display:flex;flex-direction:column;gap:10px;">
     ${isAdmin && c.status === 'Open' ? `
-    <div class="border rounded-lg p-3">
-      <div class="font-semibold text-sm mb-2">Assign Complaint</div>
-      <div class="flex gap-2">
-        <select id="assignEmpId" class="form-input flex-1">
-          <option value="">Select Employee</option>
+    <div style="border:1.5px solid #E5E7EB;border-radius:10px;padding:14px;">
+      <div style="font-weight:700;font-size:12.5px;margin-bottom:8px;color:#374151;"><i class="fas fa-user-check" style="color:#E8431A;margin-right:6px;"></i>Assign Complaint</div>
+      <div style="display:flex;gap:8px;">
+        <select id="assignEmpId" class="form-input" style="flex:1;">
+          <option value="">Select Employee...</option>
           ${employeeList.map(e => `<option value="${e.id}">${e.name} (${e.department || e.role})</option>`).join('')}
         </select>
         <button onclick="assignComplaint(${c.id})" class="btn-primary btn-sm">Assign</button>
@@ -846,51 +1019,52 @@ async function showComplaintDetail(id) {
     </div>` : ''}
 
     ${isAdmin && c.status === 'Assigned' ? `
-    <div class="border rounded-lg p-3">
-      <div class="font-semibold text-sm mb-2">Re-Assign</div>
-      <div class="flex gap-2">
-        <select id="assignEmpId" class="form-input flex-1">
+    <div style="border:1.5px solid #E5E7EB;border-radius:10px;padding:14px;">
+      <div style="font-weight:700;font-size:12.5px;margin-bottom:8px;color:#374151;"><i class="fas fa-sync" style="color:#E8431A;margin-right:6px;"></i>Re-Assign</div>
+      <div style="display:flex;gap:8px;">
+        <select id="assignEmpId" class="form-input" style="flex:1;">
           ${employeeList.map(e => `<option value="${e.id}" ${e.id == c.assigned_to_employee_id ? 'selected' : ''}>${e.name}</option>`).join('')}
         </select>
         <button onclick="assignComplaint(${c.id})" class="btn-primary btn-sm">Update</button>
       </div>
     </div>` : ''}
 
-    ${isAssignedEmp && (c.status === 'Assigned') ? `
-    <div class="border rounded-lg p-3">
-      <div class="font-semibold text-sm mb-2"><i class="fas fa-calendar mr-1"></i>Schedule Visit</div>
-      <div class="flex gap-2">
-        <input type="date" id="visitDate" class="form-input" value="${c.visit_date || ''}"/>
-        <input type="time" id="visitTime" class="form-input" value="${c.visit_time || ''}"/>
+    ${isAssignedEmp && c.status === 'Assigned' ? `
+    <div style="border:1.5px solid #E5E7EB;border-radius:10px;padding:14px;">
+      <div style="font-weight:700;font-size:12.5px;margin-bottom:8px;color:#374151;"><i class="fas fa-calendar-plus" style="color:#E8431A;margin-right:6px;"></i>Schedule Visit</div>
+      <div style="display:flex;gap:8px;">
+        <input type="date" id="visitDate" class="form-input" value="${c.visit_date||''}"/>
+        <input type="time" id="visitTime" class="form-input" value="${c.visit_time||''}"/>
         <button onclick="scheduleVisit(${c.id})" class="btn-primary btn-sm">Schedule</button>
       </div>
     </div>` : ''}
 
     ${isAssignedEmp && (c.status === 'Assigned' || c.status === 'Scheduled') ? `
-    <div class="border-2 border-green-200 rounded-lg p-3">
-      <div class="font-semibold text-sm mb-2 text-green-800"><i class="fas fa-check-double mr-1"></i>Mark as Resolved</div>
-      <textarea id="resNotes" class="form-input mb-2" rows="2" placeholder="Resolution notes..."></textarea>
-      <label class="form-label text-xs">Upload Resolution Photo</label>
-      <input type="file" id="resPhoto" accept="image/*" class="form-input mb-2"/>
-      <button onclick="resolveComplaint(${c.id})" class="btn-success w-full">Mark Resolved</button>
+    <div style="border:2px solid #A7F3D0;border-radius:10px;padding:14px;background:#FAFFFE;">
+      <div style="font-weight:700;font-size:12.5px;margin-bottom:8px;color:#065F46;"><i class="fas fa-check-double" style="margin-right:6px;"></i>Mark as Resolved</div>
+      <textarea id="resNotes" class="form-input" rows="2" placeholder="Resolution notes..." style="margin-bottom:8px;"></textarea>
+      <label class="form-label">Upload Resolution Photo</label>
+      <input type="file" id="resPhoto" accept="image/*" class="form-input" style="margin-bottom:8px;"/>
+      <button onclick="resolveComplaint(${c.id})" class="btn-success" style="width:100%;justify-content:center;"><i class="fas fa-check"></i>Mark Resolved</button>
     </div>` : ''}
 
     ${isAdmin && c.status === 'Resolved' ? `
-    <button onclick="closeComplaint(${c.id})" class="btn-primary btn-sm">Close Complaint</button>` : ''}
+    <button onclick="closeComplaint(${c.id})" class="btn-secondary btn-sm" style="align-self:flex-start;"><i class="fas fa-lock"></i>Close Complaint</button>` : ''}
   </div>
 
-  <!-- Audit Trail -->
+  <!-- Activity Timeline -->
   ${audit_trail.length > 0 ? `
-  <div class="mt-5">
-    <div class="font-semibold text-sm text-gray-700 mb-3"><i class="fas fa-history mr-1"></i>Activity Timeline</div>
+  <div style="margin-top:18px;">
+    <div style="font-weight:700;font-size:12.5px;color:#374151;margin-bottom:10px;"><i class="fas fa-history" style="color:#E8431A;margin-right:6px;"></i>Activity Timeline</div>
     <div class="timeline">
       ${audit_trail.map(a => `
       <div class="timeline-item">
-        <div class="text-sm font-medium text-gray-700">${a.description}</div>
-        <div class="text-xs text-gray-400">${formatDateTime(a.created_at)} · ${a.actor_name || 'System'}</div>
+        <div style="font-size:12.5px;font-weight:600;color:#374151;">${a.description}</div>
+        <div style="font-size:11px;color:#9CA3AF;margin-top:2px;">${formatDateTime(a.created_at)} &bull; ${a.actor_name || 'System'}</div>
       </div>`).join('')}
     </div>
   </div>` : ''}
+  </div>
   `)
 }
 
@@ -957,61 +1131,75 @@ async function showRegisterComplaint() {
     </select></div>`
   }
 
+  const catIconMap = { Plumbing:'fa-tint', Electricity:'fa-bolt', Civil:'fa-hammer', Billing:'fa-receipt', Miscellaneous:'fa-ellipsis-h' }
+  const catColorBg  = { Plumbing:'#EFF6FF', Electricity:'#FFFBEB', Civil:'#ECFDF5', Billing:'#F5F3FF', Miscellaneous:'#FFF5F3' }
+  const catColorIcon= { Plumbing:'#2563EB', Electricity:'#D97706', Civil:'#059669', Billing:'#7C3AED', Miscellaneous:'#E8431A' }
+
   showModal(`
-  <div class="flex justify-between items-center mb-4">
-    <h2 class="text-xl font-bold text-gray-800"><i class="fas fa-plus-circle mr-2 text-blue-600"></i>Register Complaint</h2>
-    <button onclick="closeModal()" class="text-gray-400"><i class="fas fa-times text-xl"></i></button>
+  <div class="modal-header">
+    <div class="modal-title"><i class="fas fa-plus-circle" style="color:#E8431A;margin-right:8px;"></i>Register Complaint</div>
+    <button onclick="closeModal()" class="modal-close"><i class="fas fa-times"></i></button>
   </div>
+  <div class="modal-body">
 
   ${unitSelector}
 
-  <div class="mb-4">
+  <div style="margin-bottom:16px;">
     <label class="form-label">Complaint Type *</label>
-    <div class="grid grid-cols-2 gap-3">
-      ${categories.map(cat => `
-      <label class="cursor-pointer">
-        <input type="radio" name="catId" value="${cat.id}" class="hidden peer" onchange="onCategoryChange(${cat.id})"/>
-        <div class="peer-checked:ring-2 peer-checked:ring-blue-600 peer-checked:bg-blue-50 border rounded-lg p-3 text-center hover:bg-gray-50 transition">
-          <div class="text-2xl mb-1"><i class="fas ${cat.icon || 'fa-tools'}"></i></div>
-          <div class="text-sm font-medium">${cat.name}</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+      ${categories.map(cat => {
+        const ic = catIconMap[cat.name] || 'fa-tools'
+        const bg = catColorBg[cat.name] || '#F9FAFB'
+        const iconColor = catColorIcon[cat.name] || '#6B7280'
+        return `<label style="cursor:pointer;">
+        <input type="radio" name="catId" value="${cat.id}" style="display:none;" onchange="onCategoryChange(${cat.id})"/>
+        <div onclick="this.previousElementSibling.click();this.previousElementSibling.dispatchEvent(new Event('change'));"
+          style="background:${bg};border:2px solid transparent;border-radius:10px;padding:12px 8px;text-align:center;
+          cursor:pointer;transition:all 0.18s;" id="catCard${cat.id}"
+          onmouseover="this.style.borderColor='${iconColor}40'"
+          onmouseout="if(!document.querySelector('input[name=catId]:checked')?.value==${cat.id})this.style.borderColor='transparent'">
+          <i class="fas ${ic}" style="color:${iconColor};font-size:18px;margin-bottom:6px;display:block;"></i>
+          <div style="font-size:11.5px;font-weight:600;color:#374151;">${cat.name}</div>
         </div>
-      </label>`).join('')}
+      </label>`}).join('')}
     </div>
   </div>
 
-  <div class="mb-4" id="subCatSection" style="display:none">
+  <div id="subCatSection" style="display:none;margin-bottom:16px;">
     <label class="form-label">Sub-Complaint Type</label>
-    <select id="compSubCatId" class="form-input">
-      <option value="">Select sub-type (optional)...</option>
-    </select>
+    <select id="compSubCatId" class="form-input"><option value="">Select sub-type (optional)...</option></select>
   </div>
 
-  <div class="mb-4">
-    <label class="form-label">Priority</label>
-    <select id="compPriority" class="form-input">
-      <option value="Normal">Normal</option>
-      <option value="Low">Low</option>
-      <option value="High">High</option>
-      <option value="Urgent">Urgent</option>
-    </select>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+    <div>
+      <label class="form-label">Priority</label>
+      <select id="compPriority" class="form-input">
+        <option value="Normal">Normal</option>
+        <option value="Low">Low</option>
+        <option value="High">High</option>
+        <option value="Urgent">Urgent</option>
+      </select>
+    </div>
+    <div>
+      <label class="form-label">Photo (Optional)</label>
+      <input type="file" id="compPhoto" accept="image/*" class="form-input" style="padding:6px;"/>
+    </div>
   </div>
 
-  <div class="mb-4">
+  <div id="photoPreviewCont" style="display:none;margin-bottom:12px;">
+    <img id="photoPreview" class="photo-preview"/>
+  </div>
+
+  <div style="margin-bottom:4px;">
     <label class="form-label">Description *</label>
     <textarea id="compDesc" class="form-input" rows="4" placeholder="Describe the issue in detail including location, severity, and any previous attempts to resolve..."></textarea>
   </div>
 
-  <div class="mb-4">
-    <label class="form-label">Upload Photo (Optional)</label>
-    <input type="file" id="compPhoto" accept="image/*" class="form-input"/>
-    <div id="photoPreviewCont" class="mt-2 hidden">
-      <img id="photoPreview" class="photo-preview"/>
-    </div>
   </div>
-
-  <button onclick="submitComplaint()" class="btn-primary w-full py-3">
-    <i class="fas fa-paper-plane mr-2"></i>Submit Complaint
-  </button>`)
+  <div class="modal-footer">
+    <button onclick="closeModal()" class="btn-ghost">Cancel</button>
+    <button onclick="submitComplaint()" class="btn-primary"><i class="fas fa-paper-plane"></i>Submit Complaint</button>
+  </div>`)
 
   document.getElementById('compPhoto')?.addEventListener('change', async (e) => {
     const f = e.target.files[0]
@@ -1024,6 +1212,19 @@ async function showRegisterComplaint() {
 }
 
 function onCategoryChange(catId) {
+  // Visual highlight
+  document.querySelectorAll('[id^="catCard"]').forEach(el => {
+    el.style.borderColor = 'transparent'
+    el.style.boxShadow = 'none'
+    el.style.transform = ''
+  })
+  const selected = document.getElementById('catCard' + catId)
+  if (selected) {
+    selected.style.borderColor = '#E8431A'
+    selected.style.boxShadow = '0 0 0 3px rgba(232,67,26,0.15)'
+    selected.style.transform = 'scale(1.03)'
+  }
+  // Sub-categories
   const subs = (window._subByCat || {})[catId] || []
   const section = document.getElementById('subCatSection')
   const select  = document.getElementById('compSubCatId')
@@ -1076,11 +1277,20 @@ async function loadUnits(params = {}) {
   const construction = units.filter(u => u.particulars?.toUpperCase().includes('CONSTRUCTION')).length
 
   document.getElementById('pageContent').innerHTML = `
-  <div class="flex justify-between items-center mb-6">
-    <h1 class="text-2xl font-bold text-gray-800"><i class="fas fa-home mr-2 text-blue-900"></i>Unit Registry</h1>
-    <div class="flex gap-2">
-      <input type="text" id="unitSearch" placeholder="Search unit, owner..." class="form-input w-48" oninput="filterUnits(this.value)"/>
-      <select id="unitFilter" onchange="filterUnits(document.getElementById('unitSearch').value)" class="form-input w-44">
+  <div class="page-header">
+    <div class="page-title">
+      <div class="page-title-icon"><i class="fas fa-building"></i></div>
+      <div>
+        <div>Unit Registry</div>
+        <div class="page-subtitle">${total} units &bull; ${occupied} occupied &bull; ${vacant} vacant</div>
+      </div>
+    </div>
+    <div class="page-actions">
+      <div style="position:relative;">
+        <i class="fas fa-search" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:#C4B5B0;font-size:12px;"></i>
+        <input type="text" id="unitSearch" placeholder="Search unit, owner..." class="form-input" style="width:200px;padding-left:32px;" oninput="filterUnits(this.value)"/>
+      </div>
+      <select id="unitFilter" onchange="filterUnits(document.getElementById('unitSearch').value)" class="filter-select">
         <option value="">All Status</option>
         <option value="occupied">Occupied</option>
         <option value="vacant">Vacant</option>
@@ -1089,11 +1299,12 @@ async function loadUnits(params = {}) {
     </div>
   </div>
 
-  <div class="grid grid-cols-4 gap-4 mb-6">
-    ${[['Total',total,'#1e3a5f'],['Occupied',occupied,'#10b981'],['Vacant',vacant,'#6b7280'],['Under Const.',construction,'#f59e0b']].map(([l,v,c]) => `
-    <div class="card p-4 text-center">
-      <div class="text-2xl font-bold" style="color:${c}">${v}</div>
-      <div class="text-gray-500 text-xs mt-1">${l}</div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px;">
+    ${[['Total Units',total,'sc-flame','fa-building'],['Occupied',occupied,'sc-green','fa-user-check'],['Vacant',vacant,'sc-teal','fa-door-open'],['Under Const.',construction,'sc-gold','fa-hard-hat']].map(([l,v,cls,ic]) => `
+    <div class="stat-card ${cls}">
+      <i class="fas ${ic} stat-icon"></i>
+      <div class="stat-number">${v}</div>
+      <div class="stat-label">${l}</div>
     </div>`).join('')}
   </div>
 
@@ -1285,11 +1496,20 @@ async function loadCustomers(params = {}) {
   const customers = r.data.customers || []
 
   document.getElementById('pageContent').innerHTML = `
-  <div class="flex justify-between items-center mb-6">
-    <h1 class="text-2xl font-bold text-gray-800"><i class="fas fa-users mr-2 text-blue-900"></i>Customer Master</h1>
-    <div class="flex gap-3">
-      <input type="text" id="custSearch" placeholder="Search by name, unit, email..." class="form-input w-56" oninput="searchCustomers(this.value)"/>
-      <button onclick="showAddCustomer()" class="btn-primary"><i class="fas fa-plus mr-1"></i>Add Customer</button>
+  <div class="page-header">
+    <div class="page-title">
+      <div class="page-title-icon"><i class="fas fa-users"></i></div>
+      <div>
+        <div>Customer Master</div>
+        <div class="page-subtitle">${customers.length} registered owner(s)</div>
+      </div>
+    </div>
+    <div class="page-actions">
+      <div style="position:relative;">
+        <i class="fas fa-search" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:#C4B5B0;font-size:12px;"></i>
+        <input type="text" id="custSearch" placeholder="Search by name, unit, email..." class="form-input" style="width:240px;padding-left:32px;" oninput="searchCustomers(this.value)"/>
+      </div>
+      <button onclick="showAddCustomer()" class="btn-primary"><i class="fas fa-plus"></i>Add Customer</button>
     </div>
   </div>
   <div class="card overflow-hidden">
@@ -2150,9 +2370,15 @@ async function loadEmployees() {
   const employees = r.data.employees || []
 
   document.getElementById('pageContent').innerHTML = `
-  <div class="flex justify-between items-center mb-6">
-    <h1 class="text-2xl font-bold text-gray-800"><i class="fas fa-user-tie mr-2 text-blue-900"></i>Employee Management</h1>
-    ${currentUser.role === 'admin' ? `<button onclick="showAddEmployee()" class="btn-primary"><i class="fas fa-plus mr-1"></i>Add Employee</button>` : ''}
+  <div class="page-header">
+    <div class="page-title">
+      <div class="page-title-icon"><i class="fas fa-user-tie"></i></div>
+      <div>
+        <div>Employee Management</div>
+        <div class="page-subtitle">${employees.length} staff member(s)</div>
+      </div>
+    </div>
+    ${currentUser.role === 'admin' ? `<button onclick="showAddEmployee()" class="btn-primary"><i class="fas fa-plus"></i>Add Employee</button>` : ''}
   </div>
   <div class="card overflow-hidden">
     <div class="overflow-x-auto">
@@ -2225,26 +2451,30 @@ async function showEmpDetails(id) {
 
 async function showAddEmployee() {
   showModal(`
-  <div class="flex justify-between items-center mb-4">
-    <h2 class="text-xl font-bold">Add Employee</h2>
-    <button onclick="closeModal()" class="text-gray-400"><i class="fas fa-times"></i></button>
+  <div class="modal-header">
+    <div class="modal-title"><i class="fas fa-user-plus" style="color:#E8431A;margin-right:8px;"></i>Add Employee</div>
+    <button onclick="closeModal()" class="modal-close"><i class="fas fa-times"></i></button>
   </div>
-  <div class="grid md:grid-cols-2 gap-4">
-    <div><label class="form-label">Full Name *</label><input id="empName" class="form-input" placeholder="Employee name"/></div>
-    <div><label class="form-label">Email *</label><input id="empEmail" type="email" class="form-input" placeholder="email@company.com"/></div>
-    <div><label class="form-label">Mobile</label><input id="empMobile" class="form-input" placeholder="Mobile number"/></div>
-    <div><label class="form-label">Role *</label>
-      <select id="empRole" class="form-input">
-        <option value="employee">Employee</option>
-        <option value="sub_admin">Sub Admin</option>
-        <option value="admin">Admin</option>
-      </select>
+  <div class="modal-body">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div><label class="form-label">Full Name *</label><input id="empName" class="form-input" placeholder="Employee name"/></div>
+      <div><label class="form-label">Email *</label><input id="empEmail" type="email" class="form-input" placeholder="email@company.com"/></div>
+      <div><label class="form-label">Mobile</label><input id="empMobile" class="form-input" placeholder="Mobile number"/></div>
+      <div><label class="form-label">Role *</label>
+        <select id="empRole" class="form-input">
+          <option value="employee">Employee</option>
+          <option value="sub_admin">Sub Admin</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div><label class="form-label">Department</label><input id="empDept" class="form-input" placeholder="e.g. Electrical, Plumbing"/></div>
+      <div><label class="form-label">Initial Password</label><input id="empPwd" type="password" class="form-input" value="Emp@123"/></div>
     </div>
-    <div><label class="form-label">Department</label><input id="empDept" class="form-input" placeholder="e.g. Electrical, Plumbing"/></div>
-    <div><label class="form-label">Initial Password</label><input id="empPwd" type="password" class="form-input" value="Emp@123"/></div>
   </div>
-  <button onclick="addEmployee()" class="btn-primary w-full mt-4">Add Employee</button>
-  `)
+  <div class="modal-footer">
+    <button onclick="closeModal()" class="btn-ghost">Cancel</button>
+    <button onclick="addEmployee()" class="btn-primary"><i class="fas fa-plus"></i>Add Employee</button>
+  </div>`)
 }
 
 async function addEmployee() {
@@ -2409,42 +2639,53 @@ function renderCalendar(content) {
   const leaveDates = new Set(leaves.map(l => l.leave_date))
 
   content.innerHTML = `
-  <div class="space-y-4">
-    <div class="flex items-center justify-between">
-      <div>
-        <h2 class="text-xl font-bold text-gray-800"><i class="fas fa-calendar-alt text-blue-600 mr-2"></i>My Visit Calendar</h2>
-        <p class="text-sm text-gray-500 mt-1">Scheduled complaint visits assigned to you</p>
-      </div>
-      <button onclick="showApplyLeaveModal()" class="btn-primary px-4 py-2 rounded-xl text-sm">
-        <i class="fas fa-plus mr-1"></i>Apply Leave
-      </button>
-    </div>
-    <div class="grid grid-cols-4 gap-3">
-      <div class="card p-4 text-center"><div class="text-2xl font-bold text-blue-600">${summary.total||0}</div><div class="text-xs text-gray-500 mt-1">Total Visits</div></div>
-      <div class="card p-4 text-center"><div class="text-2xl font-bold text-green-600">${summary.today||0}</div><div class="text-xs text-gray-500 mt-1">Today</div></div>
-      <div class="card p-4 text-center"><div class="text-2xl font-bold text-indigo-600">${summary.upcoming||0}</div><div class="text-xs text-gray-500 mt-1">Upcoming</div></div>
-      <div class="card p-4 text-center"><div class="text-2xl font-bold text-red-500">${summary.overdue||0}</div><div class="text-xs text-gray-500 mt-1">Overdue</div></div>
-    </div>
-    <div class="card p-4">
-      <div class="flex items-center justify-between flex-wrap gap-3">
-        <div class="flex bg-gray-100 rounded-xl p-1 gap-1">
-          ${['month','week','today','all'].map(v => `<button onclick="switchCalView('${v}')" class="px-3 py-1 rounded-lg text-sm font-semibold transition-all ${calView===v?'bg-blue-700 text-white':'text-gray-600 hover:bg-gray-200'}">${v.charAt(0).toUpperCase()+v.slice(1)}</button>`).join('')}
+  <div style="display:flex;flex-direction:column;gap:18px;">
+    <!-- Header -->
+    <div class="page-header">
+      <div class="page-title">
+        <div class="page-title-icon"><i class="fas fa-calendar-alt"></i></div>
+        <div>
+          <div>My Visit Calendar</div>
+          <div class="page-subtitle">Scheduled complaint visits assigned to you</div>
         </div>
-        ${calView==='month'?`<div class="flex items-center gap-2">
-          <button onclick="calNavMonth(-1)" class="p-1 rounded hover:bg-gray-100"><i class="fas fa-chevron-left"></i></button>
-          <span class="font-semibold text-gray-700 w-36 text-center">${monthNames[calMonth-1]} ${calYear}</span>
-          <button onclick="calNavMonth(1)" class="p-1 rounded hover:bg-gray-100"><i class="fas fa-chevron-right"></i></button>
+      </div>
+      <div class="page-actions">
+        <button onclick="showApplyLeaveModal()" class="btn-outline"><i class="fas fa-umbrella-beach"></i>Apply Leave</button>
+        <button onclick="navigate('leave-mgmt')" class="btn-ghost"><i class="fas fa-list"></i>All Leaves</button>
+      </div>
+    </div>
+
+    <!-- Summary tiles -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+      ${[['Total Visits',summary.total||0,'sc-flame','fa-calendar-check'],['Today',summary.today||0,'sc-green','fa-sun'],['Upcoming',summary.upcoming||0,'sc-blue','fa-calendar-plus'],['Overdue',summary.overdue||0,'sc-rose','fa-exclamation-triangle']].map(([lbl,val,cls,ic])=>`
+      <div class="stat-card ${cls}">
+        <i class="fas ${ic} stat-icon"></i>
+        <div class="stat-number">${val}</div>
+        <div class="stat-label">${lbl}</div>
+      </div>`).join('')}
+    </div>
+
+    <!-- Controls -->
+    <div class="card" style="padding:14px 18px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+        <div class="tab-group">
+          ${['month','week','today','all'].map(v => `<button onclick="switchCalView('${v}')" class="tab-pill${calView===v?' active':''}">${v.charAt(0).toUpperCase()+v.slice(1)}</button>`).join('')}
+        </div>
+        ${calView==='month'?`<div style="display:flex;align-items:center;gap:8px;">
+          <button onclick="calNavMonth(-1)" class="btn-icon btn-icon-ghost"><i class="fas fa-chevron-left" style="font-size:11px;"></i></button>
+          <span style="font-weight:700;color:#374151;min-width:140px;text-align:center;">${monthNames[calMonth-1]} ${calYear}</span>
+          <button onclick="calNavMonth(1)" class="btn-icon btn-icon-ghost"><i class="fas fa-chevron-right" style="font-size:11px;"></i></button>
         </div>`:''}
-        ${calView==='week'?`<div class="flex items-center gap-2">
-          <button onclick="calNavWeek(-1)" class="p-1 rounded hover:bg-gray-100"><i class="fas fa-chevron-left"></i></button>
-          <span class="font-semibold text-gray-700 text-sm">Week of ${formatDate(calWeekStart)}</span>
-          <button onclick="calNavWeek(1)" class="p-1 rounded hover:bg-gray-100"><i class="fas fa-chevron-right"></i></button>
+        ${calView==='week'?`<div style="display:flex;align-items:center;gap:8px;">
+          <button onclick="calNavWeek(-1)" class="btn-icon btn-icon-ghost"><i class="fas fa-chevron-left" style="font-size:11px;"></i></button>
+          <span style="font-weight:700;color:#374151;">Week of ${formatDate(calWeekStart)}</span>
+          <button onclick="calNavWeek(1)" class="btn-icon btn-icon-ghost"><i class="fas fa-chevron-right" style="font-size:11px;"></i></button>
         </div>`:''}
       </div>
-      <div class="flex items-center gap-4 mt-3 text-xs">
-        <span class="flex items-center gap-1"><span class="w-3 h-3 bg-blue-200 rounded inline-block"></span>Scheduled Visit</span>
-        <span class="flex items-center gap-1"><span class="w-3 h-3 bg-red-200 rounded inline-block"></span>Approved Leave</span>
-        <span class="flex items-center gap-1"><span class="w-3 h-3 bg-yellow-300 rounded inline-block"></span>Today</span>
+      <div style="display:flex;gap:16px;margin-top:10px;font-size:11.5px;color:#6B7280;">
+        <span style="display:flex;align-items:center;gap:5px;"><span style="width:12px;height:12px;background:#DBEAFE;border-radius:3px;display:inline-block;"></span>Scheduled Visit</span>
+        <span style="display:flex;align-items:center;gap:5px;"><span style="width:12px;height:12px;background:#FEE2E2;border-radius:3px;display:inline-block;"></span>Leave Day</span>
+        <span style="display:flex;align-items:center;gap:5px;"><span style="width:12px;height:12px;background:#FEF3C7;border:2px solid #E8431A;border-radius:3px;display:inline-block;"></span>Today</span>
       </div>
     </div>
     <div class="card p-4">
@@ -2547,27 +2788,28 @@ function showDayDetail(dateStr) {
 
 function showApplyLeaveModal() {
   const today = new Date().toISOString().split('T')[0]
-  showModal(`<div class="p-4">
-    <div class="flex items-center justify-between mb-4">
-      <h3 class="font-bold text-gray-800"><i class="fas fa-umbrella-beach mr-2 text-orange-500"></i>Apply for Leave</h3>
-      <button onclick="closeModal()" class="text-gray-400 hover:text-gray-700"><i class="fas fa-times"></i></button>
-    </div>
-    <div class="space-y-3">
+  showModal(`
+  <div class="modal-header">
+    <div class="modal-title"><i class="fas fa-umbrella-beach" style="color:#F59E0B;margin-right:8px;"></i>Apply for Leave</div>
+    <button onclick="closeModal()" class="modal-close"><i class="fas fa-times"></i></button>
+  </div>
+  <div class="modal-body">
+    <div style="display:grid;gap:14px;">
       <div><label class="form-label">Leave Date *</label>
         <input type="date" id="leaveDate" class="form-input" min="${today}" required/></div>
       <div><label class="form-label">Leave Type</label>
         <select id="leaveType" class="form-input">
           <option value="Full Day">Full Day</option>
-          <option value="Half Day AM">Half Day – Morning</option>
-          <option value="Half Day PM">Half Day – Afternoon</option>
+          <option value="Half Day AM">Half Day &ndash; Morning</option>
+          <option value="Half Day PM">Half Day &ndash; Afternoon</option>
         </select></div>
-      <div><label class="form-label">Reason</label>
-        <textarea id="leaveReason" class="form-input" rows="3" placeholder="Optional reason for leave..."></textarea></div>
-      <div class="flex gap-2 pt-2">
-        <button onclick="submitLeaveApplication()" class="btn-primary flex-1 py-2 rounded-xl">Submit Application</button>
-        <button onclick="closeModal()" class="flex-1 py-2 border rounded-xl text-gray-600">Cancel</button>
-      </div>
+      <div><label class="form-label">Reason <span style="color:#9CA3AF;font-weight:400;">(optional)</span></label>
+        <textarea id="leaveReason" class="form-input" rows="3" placeholder="Reason for leave..."></textarea></div>
     </div>
+  </div>
+  <div class="modal-footer">
+    <button onclick="closeModal()" class="btn-ghost">Cancel</button>
+    <button onclick="submitLeaveApplication()" class="btn-primary"><i class="fas fa-paper-plane"></i>Submit Application</button>
   </div>`)
 }
 
@@ -2593,25 +2835,27 @@ async function loadLeaveManagement() {
   const { leaves = [], pendingCount = 0 } = r.data
 
   content.innerHTML = `
-  <div class="space-y-4">
-    <div class="flex items-center justify-between">
-      <div>
-        <h2 class="text-xl font-bold text-gray-800"><i class="fas fa-umbrella-beach text-orange-500 mr-2"></i>Leave Management</h2>
-        <p class="text-sm text-gray-500 mt-1">${isManager ? 'Review and approve employee leave requests' : 'Your leave applications'}</p>
+  <div style="display:flex;flex-direction:column;gap:18px;">
+    <div class="page-header">
+      <div class="page-title">
+        <div class="page-title-icon"><i class="fas fa-umbrella-beach"></i></div>
+        <div>
+          <div>Leave Management</div>
+          <div class="page-subtitle">${isManager ? 'Review and approve employee leave requests' : 'Your leave applications'}</div>
+        </div>
       </div>
-      <div class="flex gap-2">
-        ${isManager && pendingCount > 0 ? `<span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-semibold">${pendingCount} Pending</span>` : ''}
-        ${!isManager ? `<button onclick="showApplyLeaveModal()" class="btn-primary px-4 py-2 rounded-xl text-sm"><i class="fas fa-plus mr-1"></i>Apply Leave</button>` : ''}
-      </div>
-    </div>
-    <div class="card p-4">
-      <div class="flex gap-2 flex-wrap">
-        ${['All','Pending','Approved','Rejected'].map(s => `<button onclick="filterLeaves('${s}')" id="leaveTab${s}"
-          class="px-3 py-1 rounded-full text-xs font-semibold border transition-all ${s==='All'?'bg-blue-700 text-white border-blue-700':'text-gray-600 border-gray-300 hover:bg-gray-100'}">${s}</button>`).join('')}
+      <div class="page-actions">
+        ${isManager && pendingCount > 0 ? `<span style="background:#FFF7ED;color:#C2410C;border:1px solid #FED7AA;border-radius:20px;padding:5px 12px;font-size:12px;font-weight:700;">${pendingCount} Pending</span>` : ''}
+        ${!isManager ? `<button onclick="showApplyLeaveModal()" class="btn-primary"><i class="fas fa-plus"></i>Apply Leave</button>` : ''}
       </div>
     </div>
-    <div class="card p-4">
-      <div id="leaveTableContainer">${renderLeaveTable(leaves, isManager)}</div>
+    <div class="card" style="padding:14px 18px;">
+      <div class="tab-group" style="display:inline-flex;">
+        ${['All','Pending','Approved','Rejected'].map(s => `<button onclick="filterLeaves('${s}')" id="leaveTab${s}" class="tab-pill${s==='All'?' active':''}">${s}</button>`).join('')}
+      </div>
+    </div>
+    <div class="card">
+      <div id="leaveTableContainer" style="padding:4px 0;">${renderLeaveTable(leaves, isManager)}</div>
     </div>
   </div>`
   window._allLeaves = leaves
@@ -2652,7 +2896,7 @@ function leaveStatusBadge(status) {
 function filterLeaves(status) {
   ['All','Pending','Approved','Rejected'].forEach(s => {
     const btn = document.getElementById('leaveTab'+s)
-    if (btn) btn.className = `px-3 py-1 rounded-full text-xs font-semibold border transition-all ${s===status?'bg-blue-700 text-white border-blue-700':'text-gray-600 border-gray-300 hover:bg-gray-100'}`
+    if (btn) { btn.className = 'tab-pill' + (s===status?' active':'') }
   })
   const isManager = ['admin','sub_admin'].includes(currentUser.role)
   const filtered = status==='All' ? window._allLeaves : (window._allLeaves||[]).filter(l=>l.status===status)
@@ -2684,21 +2928,25 @@ async function loadVehicles() {
   const { vehicles = [] } = r.data
 
   content.innerHTML = `
-  <div class="space-y-4">
-    <div class="flex items-center justify-between">
-      <div>
-        <h2 class="text-xl font-bold text-gray-800"><i class="fas fa-car text-blue-600 mr-2"></i>Vehicle Registry</h2>
-        <p class="text-sm text-gray-500 mt-1">${vehicles.length} vehicle(s) registered</p>
+  <div style="display:flex;flex-direction:column;gap:18px;">
+    <div class="page-header">
+      <div class="page-title">
+        <div class="page-title-icon"><i class="fas fa-car"></i></div>
+        <div>
+          <div>Vehicle Registry</div>
+          <div class="page-subtitle">${vehicles.length} vehicle(s) registered across all units</div>
+        </div>
       </div>
-      <button onclick="showAddVehicleModal()" class="btn-primary px-4 py-2 rounded-xl text-sm">
-        <i class="fas fa-plus mr-1"></i>Register Vehicle
-      </button>
+      <button onclick="showAddVehicleModal()" class="btn-primary"><i class="fas fa-plus"></i>Register Vehicle</button>
     </div>
-    <div class="card p-4">
-      <input type="text" id="vehicleSearch" placeholder="Search by vehicle number, unit, or owner..."
-        class="form-input" oninput="filterVehicles(this.value)"/>
+    <div class="card" style="padding:14px 18px;">
+      <div style="position:relative;">
+        <i class="fas fa-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#C4B5B0;font-size:13px;"></i>
+        <input type="text" id="vehicleSearch" placeholder="Search by vehicle number, unit, owner or make..."
+          class="form-input" style="padding-left:36px;" oninput="filterVehicles(this.value)"/>
+      </div>
     </div>
-    <div id="vehicleList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div id="vehicleList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;">
       ${renderVehicleCards(vehicles)}
     </div>
   </div>`
@@ -2706,35 +2954,42 @@ async function loadVehicles() {
 }
 
 function renderVehicleCards(vehicles) {
-  if (!vehicles.length) return `<div class="col-span-3 text-center py-12 text-gray-400"><i class="fas fa-car text-4xl mb-3"></i><p>No vehicles registered</p></div>`
+  if (!vehicles.length) return `<div class="empty-state" style="grid-column:1/-1;"><i class="fas fa-car"></i><p>No vehicles registered yet</p></div>`
   const typeIcons = { Car:'fa-car', Bike:'fa-motorcycle', Scooter:'fa-motorcycle', Truck:'fa-truck', Other:'fa-car-side' }
+  const typeColors = { Car:'#2563EB', Bike:'#7C3AED', Scooter:'#7C3AED', Truck:'#D97706', Other:'#059669' }
   return vehicles.map(v => `
-    <div class="card p-4">
-      <div class="flex items-start justify-between">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-            <i class="fas ${typeIcons[v.vehicle_type]||'fa-car'} text-blue-600"></i>
+    <div class="item-card" style="padding:16px;">
+      <!-- Header -->
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="width:42px;height:42px;border-radius:10px;background:${typeColors[v.vehicle_type]||'#2563EB'}15;display:flex;align-items:center;justify-content:center;border:1.5px solid ${typeColors[v.vehicle_type]||'#2563EB'}30;">
+            <i class="fas ${typeIcons[v.vehicle_type]||'fa-car'}" style="color:${typeColors[v.vehicle_type]||'#2563EB'};font-size:16px;"></i>
           </div>
           <div>
-            <div class="font-bold text-gray-800 font-mono tracking-wide">${v.vehicle_number}</div>
-            <div class="text-xs text-gray-500">${v.vehicle_type}${v.make?' · '+v.make:''} ${v.model||''}</div>
+            <div style="font-weight:800;font-size:15px;letter-spacing:0.05em;color:#111827;font-family:monospace;">${v.vehicle_number}</div>
+            <div style="font-size:11.5px;color:#9CA3AF;margin-top:2px;">${v.vehicle_type}${v.make?' &bull; '+v.make:''} ${v.model||''}</div>
           </div>
         </div>
-        <div class="flex gap-1">
-          <button onclick="showVehicleDetail(${v.id})" class="text-blue-500 p-1 hover:bg-blue-50 rounded" title="View Details"><i class="fas fa-eye text-sm"></i></button>
-          <button onclick="showEditVehicle(${v.id})" class="text-green-500 p-1 hover:bg-green-50 rounded" title="Edit"><i class="fas fa-edit text-sm"></i></button>
-          <button onclick="removeVehicle(${v.id})" class="text-red-400 p-1 hover:bg-red-50 rounded" title="Remove"><i class="fas fa-trash text-sm"></i></button>
+        <div style="display:flex;gap:4px;">
+          <button onclick="showVehicleDetail(${v.id})" class="btn-icon" style="color:#2563EB;background:#EFF6FF;border:1px solid #DBEAFE;" title="View"><i class="fas fa-eye" style="font-size:12px;"></i></button>
+          <button onclick="showEditVehicle(${v.id})" class="btn-icon" style="color:#059669;background:#ECFDF5;border:1px solid #D1FAE5;" title="Edit"><i class="fas fa-edit" style="font-size:12px;"></i></button>
+          <button onclick="removeVehicle(${v.id})" class="btn-icon" style="color:#DC2626;background:#FEF2F2;border:1px solid #FECACA;" title="Remove"><i class="fas fa-trash" style="font-size:12px;"></i></button>
         </div>
       </div>
-      <div class="mt-3 pt-3 border-t grid grid-cols-2 gap-2 text-xs">
-        <div><span class="text-gray-400">Unit:</span> <span class="font-medium">${v.unit_no}</span></div>
-        <div><span class="text-gray-400">Color:</span> <span class="font-medium">${v.color||'—'}</span></div>
-        <div><span class="text-gray-400">Owner:</span> <span class="font-medium">${v.owner_name||'—'}</span></div>
-        <div><span class="text-gray-400">Tenant:</span> <span class="font-medium">${v.tenant_name||'—'}</span></div>
+      <!-- Details grid -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;border-top:1px solid #F3F4F6;padding-top:12px;">
+        <div><span style="color:#9CA3AF;">Unit</span><div style="font-weight:600;color:#374151;">${v.unit_no}</div></div>
+        <div><span style="color:#9CA3AF;">Color</span><div style="font-weight:600;color:#374151;">${v.color||'&mdash;'}</div></div>
+        <div><span style="color:#9CA3AF;">Owner</span><div style="font-weight:600;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${v.owner_name||'&mdash;'}</div></div>
+        <div><span style="color:#9CA3AF;">Tenant</span><div style="font-weight:600;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${v.tenant_name||'&mdash;'}</div></div>
       </div>
-      ${v.rc_file_data ? `<div class="mt-2"><button onclick="viewRcDocument(${v.id})" class="text-xs text-blue-600 hover:underline"><i class="fas fa-file-pdf mr-1"></i>View RC Document</button></div>`
-        : '<div class="mt-2 text-xs text-gray-400"><i class="fas fa-exclamation-circle mr-1"></i>No RC uploaded</div>'}
-      <div class="mt-1 text-xs text-gray-400">Registered ${formatDate(v.registered_at)}</div>
+      <!-- RC & date -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;">
+        ${v.rc_file_data
+          ? `<button onclick="viewRcDocument(${v.id})" style="background:#FFF0EC;color:#E8431A;border:1px solid #FDDDD4;border-radius:6px;padding:4px 10px;font-size:11.5px;font-weight:600;cursor:pointer;"><i class="fas fa-file-alt" style="margin-right:4px;"></i>View RC</button>`
+          : `<span style="font-size:11px;color:#9CA3AF;"><i class="fas fa-exclamation-circle" style="margin-right:4px;"></i>No RC uploaded</span>`}
+        <span style="font-size:10.5px;color:#C4B5B0;">${formatDate(v.registered_at)}</span>
+      </div>
     </div>`).join('')
 }
 
@@ -2974,63 +3229,96 @@ async function loadComplaintsMaster() {
   const catIcons = { Plumbing:'fa-tint', Electricity:'fa-bolt', Civil:'fa-hammer', Billing:'fa-receipt', Miscellaneous:'fa-ellipsis-h' }
   const catColors = { Plumbing:'blue', Electricity:'yellow', Civil:'green', Billing:'purple', Miscellaneous:'gray' }
 
+  const catColorMap = {
+    Plumbing:   { bg:'#EFF6FF', border:'#BFDBFE', icon:'#2563EB', badge:'#DBEAFE', badgeText:'#1E40AF' },
+    Electricity:{ bg:'#FFFBEB', border:'#FDE68A', icon:'#D97706', badge:'#FEF3C7', badgeText:'#92400E' },
+    Civil:      { bg:'#ECFDF5', border:'#A7F3D0', icon:'#059669', badge:'#D1FAE5', badgeText:'#065F46' },
+    Billing:    { bg:'#F5F3FF', border:'#DDD6FE', icon:'#7C3AED', badge:'#EDE9FE', badgeText:'#4C1D95' },
+    Miscellaneous:{ bg:'#FFF5F3', border:'#FDDDD4', icon:'#E8431A', badge:'#FEE2D5', badgeText:'#7C2D12' }
+  }
   content.innerHTML = `
-  <div class="space-y-4">
-    <div class="flex items-center justify-between">
-      <div>
-        <h2 class="text-xl font-bold text-gray-800"><i class="fas fa-layer-group text-purple-600 mr-2"></i>Complaints Master</h2>
-        <p class="text-sm text-gray-500 mt-1">Complaint types and sub-types configuration</p>
+  <div style="display:flex;flex-direction:column;gap:18px;">
+    <div class="page-header">
+      <div class="page-title">
+        <div class="page-title-icon"><i class="fas fa-layer-group"></i></div>
+        <div>
+          <div>Complaints Master</div>
+          <div class="page-subtitle">${categories.length} complaint types &bull; ${subCategories.length} sub-types configured</div>
+        </div>
       </div>
-      <button onclick="showRegisterComplaint()" class="btn-primary px-4 py-2 rounded-xl text-sm">
-        <i class="fas fa-plus mr-1"></i>Register Complaint
-      </button>
+      <button onclick="showRegisterComplaint()" class="btn-primary"><i class="fas fa-plus"></i>Register Complaint</button>
     </div>
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+    <!-- Category overview cards -->
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;">
       ${categories.map(cat => {
         const subs = subByCat[cat.id] || []
+        const c = catColorMap[cat.name] || catColorMap.Miscellaneous
         const icon = catIcons[cat.name] || 'fa-exclamation-circle'
-        return `<div class="card p-4">
-          <div class="flex items-center gap-3 mb-3">
-            <div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-              <i class="fas ${icon} text-purple-600"></i>
+        return `<div style="background:${c.bg};border:1.5px solid ${c.border};border-radius:12px;padding:14px;text-align:center;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
+          <div style="width:36px;height:36px;border-radius:10px;background:white;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;box-shadow:0 1px 6px rgba(0,0,0,0.08);">
+            <i class="fas ${icon}" style="color:${c.icon};font-size:15px;"></i>
+          </div>
+          <div style="font-weight:700;font-size:12.5px;color:#111827;">${cat.name}</div>
+          <div style="margin-top:5px;padding:2px 8px;background:${c.badge};color:${c.badgeText};border-radius:20px;font-size:10.5px;font-weight:700;display:inline-block;">${subs.length} sub-types</div>
+        </div>`
+      }).join('')}
+    </div>
+
+    <!-- Detailed category cards -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+      ${categories.map(cat => {
+        const subs = subByCat[cat.id] || []
+        const c = catColorMap[cat.name] || catColorMap.Miscellaneous
+        const icon = catIcons[cat.name] || 'fa-exclamation-circle'
+        return `<div class="card">
+          <div style="background:${c.bg};border-bottom:1px solid ${c.border};padding:14px 18px;border-radius:14px 14px 0 0;display:flex;align-items:center;gap:10px;">
+            <div style="width:34px;height:34px;border-radius:9px;background:white;display:flex;align-items:center;justify-content:center;">
+              <i class="fas ${icon}" style="color:${c.icon};"></i>
             </div>
             <div>
-              <div class="font-bold text-gray-800">${cat.name}</div>
-              <div class="text-xs text-gray-500">${subs.length} sub-type(s) available</div>
+              <div style="font-weight:700;color:#111827;font-size:14px;">${cat.name}</div>
+              <div style="font-size:11px;color:#6B7280;">${subs.length} sub-type(s)</div>
             </div>
           </div>
-          <div class="space-y-1">
-            ${subs.map((sc,i) => `<div class="flex items-center justify-between p-2 bg-gray-50 rounded-lg text-sm">
-              <span class="flex items-center gap-2">
-                <span class="w-5 h-5 bg-purple-200 text-purple-800 rounded-full text-xs flex items-center justify-center font-bold">${i+1}</span>
-                ${sc.name}
-              </span>
-              <span class="text-xs text-green-600"><i class="fas fa-check-circle"></i> Active</span>
-            </div>`).join('')}
-            ${!subs.length?'<div class="text-xs text-gray-400 text-center py-2">No sub-types defined</div>':''}
+          <div style="padding:12px 18px;">
+            ${subs.length === 0 ? `<p style="color:#9CA3AF;font-size:12.5px;text-align:center;padding:12px;">No sub-types configured</p>` :
+              subs.map((sc,i) => `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-radius:8px;background:${i%2===0?c.bg:'transparent'};margin-bottom:3px;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="width:20px;height:20px;background:${c.badge};color:${c.badgeText};border-radius:50%;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${i+1}</span>
+                  <span style="font-size:12.5px;color:#374151;font-weight:500;">${sc.name}</span>
+                </div>
+                <span style="font-size:10.5px;color:#10B981;font-weight:600;"><i class="fas fa-check-circle" style="margin-right:3px;"></i>Active</span>
+              </div>`).join('')}
           </div>
         </div>`
       }).join('')}
     </div>
-    <div class="card p-4">
-      <h3 class="font-bold text-gray-700 mb-2"><i class="fas fa-info-circle text-blue-500 mr-2"></i>How to Register a Complaint</h3>
-      <ol class="text-sm text-gray-600 space-y-1 list-decimal list-inside">
-        <li>Select the <strong>Complaint Type</strong> (e.g. Plumbing, Electrical)</li>
-        <li>Select the <strong>Sub-Type</strong> for more specific categorization</li>
-        <li>Add a detailed <strong>Description</strong> of the issue</li>
-        <li>Optionally attach a <strong>Photo</strong> of the problem</li>
-        <li>Set <strong>Priority</strong> based on urgency</li>
-      </ol>
+
+    <!-- How-to guide -->
+    <div class="card" style="padding:18px 22px;border-left:4px solid #E8431A;">
+      <div style="font-weight:700;color:#111827;margin-bottom:10px;font-size:13.5px;"><i class="fas fa-info-circle" style="color:#E8431A;margin-right:8px;"></i>How to Register a Complaint</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;">
+        ${[['1','fa-layer-group','Select Type','Choose the main complaint category'],['2','fa-list','Sub-Type','Pick a specific sub-type'],['3','fa-align-left','Describe','Add detailed description'],['4','fa-image','Photo','Optionally attach a photo'],['5','fa-flag','Priority','Set urgency level']].map(([num,ic,lbl,desc])=>`
+        <div style="text-align:center;padding:12px 8px;background:#FFF5F3;border-radius:10px;">
+          <div style="width:28px;height:28px;background:linear-gradient(135deg,#E8431A,#8B1A1A);border-radius:50%;color:white;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;margin:0 auto 6px;">${num}</div>
+          <i class="fas ${ic}" style="color:#E8431A;font-size:14px;margin-bottom:5px;display:block;"></i>
+          <div style="font-weight:700;font-size:11.5px;color:#111827;">${lbl}</div>
+          <div style="font-size:10.5px;color:#9CA3AF;margin-top:2px;">${desc}</div>
+        </div>`).join('')}
+      </div>
     </div>
   </div>`
 }
 
 // ── Modal ─────────────────────────────────────────────────────
 function showModal(content) {
+  const existing = document.getElementById('modalOverlay')
+  if (existing) existing.remove()
   const overlay = document.createElement('div')
   overlay.className = 'modal-overlay'
   overlay.id = 'modalOverlay'
-  overlay.innerHTML = `<div class="modal">${content}</div>`
+  overlay.innerHTML = `<div class="modal" style="padding:0;">${content}</div>`
   overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal() })
   document.body.appendChild(overlay)
 }
