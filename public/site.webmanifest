@@ -1,0 +1,13 @@
+{
+  "name": "Emperium City GRS",
+  "short_name": "Emperium",
+  "description": "Grievance Redressal System",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#2D0808",
+  "theme_color": "#E8431A",
+  "icons": [
+    { "src": "/favicon.png", "sizes": "32x32", "type": "image/png" },
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

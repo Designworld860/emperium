@@ -665,12 +665,15 @@ function showApp() {
   const userInitial = (currentUser.name || 'U').charAt(0).toUpperCase()
 
   document.getElementById('app').innerHTML = `
+  <!-- Sidebar backdrop for mobile -->
+  <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="closeSidebar()"></div>
+
   <div class="app-shell">
     <!-- ═══ SIDEBAR ══════════════════════════════════════════ -->
     <aside class="sidebar" id="sidebar">
       <!-- Logo -->
       <div class="sidebar-logo">
-        <img src="/static/emperium-logo.png" alt="Emperium City" style="width:150px;margin:0 auto 10px;display:block;filter:brightness(1.05)"/>
+        <img src="/static/emperium-logo.png" alt="Emperium City" style="width:140px;margin:0 auto 10px;display:block;filter:brightness(1.05)"/>
         <div class="grs-label">Grievance Redressal System</div>
       </div>
 
@@ -721,10 +724,15 @@ function showApp() {
     <div class="main-area">
       <!-- Top bar -->
       <header class="topbar">
+        <!-- Hamburger (mobile) -->
+        <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Open menu">
+          <i class="fas fa-bars"></i>
+        </button>
+
         <div class="topbar-search">
           <i class="fas fa-search search-icon"></i>
           <input type="text" id="globalSearch"
-            placeholder="Search units, residents, complaints..."
+            placeholder="Search units, complaints..."
             oninput="onSearch(this.value)"/>
           <div id="searchDropdown" class="hidden"></div>
         </div>
@@ -732,7 +740,7 @@ function showApp() {
           <div class="topbar-date">
             <i class="fas fa-calendar mr-1.5" style="color:#E8431A"></i>${dayjs().format('ddd, D MMM YYYY')}
           </div>
-          <button onclick="navigate('notifications')" class="notif-btn" title="Notifications">
+          <button onclick="navigate('notifications'); closeSidebar();" class="notif-btn" title="Notifications">
             <i class="fas fa-bell"></i>
             <span id="notifBadge" class="notif-dot hidden"></span>
           </button>
@@ -744,14 +752,41 @@ function showApp() {
         <div class="loading"><div class="spinner"></div><span class="loading-text">Loading…</span></div>
       </div>
     </div>
-  </div>`
+  </div>
+
+  <!-- ═══ MOBILE BOTTOM NAV ════════════════════════════════════ -->
+  <nav class="mobile-bottom-nav" id="mobileBottomNav">
+    <div class="mbn-inner">
+      <button class="mbn-item" id="mbn-dashboard" onclick="mbnNav('dashboard')">
+        <i class="fas fa-tachometer-alt mbn-icon"></i>
+        <span class="mbn-label">Home</span>
+      </button>
+      <button class="mbn-item" id="mbn-complaints" onclick="mbnNav('complaints')">
+        <i class="fas fa-exclamation-circle mbn-icon"></i>
+        <span class="mbn-label">Complaints</span>
+      </button>
+      ${isStaff ? `
+      <button class="mbn-item" id="mbn-units" onclick="mbnNav('units')">
+        <i class="fas fa-building mbn-icon"></i>
+        <span class="mbn-label">Units</span>
+      </button>` : `
+      <button class="mbn-item" id="mbn-notifications" onclick="mbnNav('notifications')">
+        <i class="fas fa-bell mbn-icon"></i>
+        <span class="mbn-label">Alerts</span>
+      </button>`}
+      <button class="mbn-item mbn-more" id="mbn-more" onclick="toggleSidebar()">
+        <i class="fas fa-th-large mbn-icon"></i>
+        <span class="mbn-label">More</span>
+      </button>
+    </div>
+  </nav>`
 
   navigate('dashboard')
   loadNotifCount()
 }
 
 function navItem(page, label, icon) {
-  return `<a href="#" onclick="navigate('${page}'); return false;" id="nav-${page}" class="nav-item">
+  return `<a href="#" onclick="navigate('${page}'); closeSidebar(); return false;" id="nav-${page}" class="nav-item">
     <i class="fas ${icon} nav-icon"></i><span>${label}</span>
   </a>`
 }
@@ -760,11 +795,46 @@ function setActiveNav(page) {
   document.querySelectorAll('#mainNav .nav-item').forEach(a => a.classList.remove('active'))
   const el = document.getElementById('nav-' + page)
   if (el) el.classList.add('active')
+  // Sync mobile bottom nav
+  document.querySelectorAll('.mbn-item').forEach(b => b.classList.remove('active'))
+  const mbnEl = document.getElementById('mbn-' + page)
+  if (mbnEl) mbnEl.classList.add('active')
+}
+
+// ── Mobile Sidebar Controls ──────────────────────────────────
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar')
+  const backdrop = document.getElementById('sidebarBackdrop')
+  if (!sidebar) return
+  const isOpen = sidebar.classList.contains('open')
+  if (isOpen) {
+    sidebar.classList.remove('open')
+    backdrop?.classList.remove('active')
+    document.body.style.overflow = ''
+  } else {
+    sidebar.classList.add('open')
+    backdrop?.classList.add('active')
+    document.body.style.overflow = 'hidden'
+  }
+}
+
+function closeSidebar() {
+  const sidebar = document.getElementById('sidebar')
+  const backdrop = document.getElementById('sidebarBackdrop')
+  if (sidebar) sidebar.classList.remove('open')
+  if (backdrop) backdrop.classList.remove('active')
+  document.body.style.overflow = ''
+}
+
+function mbnNav(page) {
+  navigate(page)
+  closeSidebar()
 }
 
 function navigate(page, params = {}) {
   currentPage = page
   setActiveNav(page)
+  closeSidebar()
   const content = document.getElementById('pageContent')
   if (!content) return
   content.innerHTML = `<div class="loading"><div class="spinner"></div></div>`
@@ -928,7 +998,7 @@ async function loadAdminDashboard() {
   </div>
 
   <!-- KPI Row -->
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:20px;">
+  <div class="grid-4" style="margin-bottom:20px;">
     <div class="stat-card sc-flame">
       <i class="fas fa-building stat-icon"></i>
       <div class="stat-number">${us.total_units || 0}</div>
@@ -961,7 +1031,7 @@ async function loadAdminDashboard() {
       <span class="card-title"><i class="fas fa-stream" style="color:#E8431A;margin-right:8px;"></i>Complaint Pipeline</span>
     </div>
     <div class="card-body" style="padding:16px 20px;">
-      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;">
+      <div class="grid-5" style="gap:12px;">
         ${[['Open','open_count','#F59E0B','#FFF3E0'],['Assigned','assigned_count','#3B82F6','#EFF6FF'],['Scheduled','scheduled_count','#8B5CF6','#F5F3FF'],['Resolved','resolved_count','#10B981','#ECFDF5'],['Closed','closed_count','#6B7280','#F9FAFB']].map(([label,key,color,bg]) => `
         <div style="text-align:center;padding:14px 8px;border-radius:12px;background:${bg};border:1.5px solid ${color}22;">
           <div style="font-size:24px;font-weight:800;color:${color};">${cs[key] || 0}</div>
@@ -972,7 +1042,7 @@ async function loadAdminDashboard() {
   </div>
 
   <!-- Bottom Grid -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+  <div class="grid-2" style="gap:20px;">
     <!-- Recent Complaints -->
     <div class="card">
       <div class="card-header">
@@ -1047,7 +1117,7 @@ async function loadEmployeeDashboard() {
   </div>
 
   <!-- Stats -->
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;">
+  <div class="grid-4" style="margin-bottom:20px;">
     ${[['Assigned to Me','total_assigned','sc-flame','fa-tasks'],['Pending','pending','sc-gold','fa-hourglass-half'],['Scheduled','scheduled','sc-purple','fa-calendar-check'],['Resolved','resolved','sc-green','fa-check-circle']].map(([label,key,cls,ic]) => `
     <div class="stat-card ${cls}">
       <i class="fas ${ic} stat-icon"></i>
@@ -1115,7 +1185,7 @@ async function loadCustomerDashboard() {
   </div>
 
   <!-- Profile + Stats -->
-  <div style="display:grid;grid-template-columns:300px 1fr;gap:20px;margin-bottom:20px;">
+  <div style="display:grid;grid-template-columns:300px 1fr;gap:20px;margin-bottom:20px;" class="form-2col">
     <!-- Profile card -->
     <div class="card">
       <div style="background:linear-gradient(135deg,#E8431A,#8B1A1A);height:60px;border-radius:14px 14px 0 0;"></div>
@@ -1133,7 +1203,7 @@ async function loadCustomerDashboard() {
     </div>
     <!-- Stats -->
     <div style="display:flex;flex-direction:column;gap:14px;">
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+      <div class="grid-3" style="gap:12px;">
         ${[['Total Complaints','total','sc-flame','fa-exclamation-circle'],['Open','open_count','sc-gold','fa-clock'],['Resolved','resolved','sc-green','fa-check-circle']].map(([lbl,key,cls,ic])=>`
         <div class="stat-card ${cls}">
           <i class="fas ${ic} stat-icon"></i>
@@ -1341,7 +1411,7 @@ async function showComplaintDetail(id) {
   </div>
   <div class="modal-body">
 
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;" class="form-2col">
     <div style="background:#F9FAFB;border-radius:10px;padding:14px;font-size:12.5px;display:grid;gap:7px;">
       <div style="display:flex;gap:8px;"><span style="color:#9CA3AF;min-width:80px;">Unit</span><strong style="color:#111827;">Unit ${c.unit_no}</strong></div>
       <div style="display:flex;gap:8px;"><span style="color:#9CA3AF;min-width:80px;">Category</span><strong style="color:#111827;">${c.category_name}${c.sub_category_name ? ' &rarr; '+c.sub_category_name : ''}</strong></div>
@@ -1507,7 +1577,7 @@ async function showRegisterComplaint() {
 
   <div style="margin-bottom:16px;">
     <label class="form-label">Complaint Type *</label>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+    <div class="grid-3" style="gap:8px;">
       ${categories.map(cat => {
         const ic = catIconMap[cat.name] || 'fa-tools'
         const bg = catColorBg[cat.name] || '#F9FAFB'
@@ -1531,7 +1601,7 @@ async function showRegisterComplaint() {
     <select id="compSubCatId" class="form-input"><option value="">Select sub-type (optional)...</option></select>
   </div>
 
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;" class="form-2col">
     <div>
       <label class="form-label">Priority</label>
       <select id="compPriority" class="form-input">
@@ -1665,7 +1735,7 @@ async function loadUnits(params = {}) {
     </div>
   </div>
 
-  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:18px;">
+  <div class="grid-5" style="margin-bottom:18px;">
     ${[
       ['Total',total,'sc-flame','fa-building'],
       ['Owner Occ.',ownerOcc,'sc-blue','fa-home'],
@@ -3130,7 +3200,7 @@ function renderCalendar(content) {
     </div>
 
     <!-- Summary tiles -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+    <div class="grid-4" style="gap:12px;">
       ${[['Total Visits',summary.total||0,'sc-flame','fa-calendar-check'],['Today',summary.today||0,'sc-green','fa-sun'],['Upcoming',summary.upcoming||0,'sc-blue','fa-calendar-plus'],['Overdue',summary.overdue||0,'sc-rose','fa-exclamation-triangle']].map(([lbl,val,cls,ic])=>`
       <div class="stat-card ${cls}">
         <i class="fas ${ic} stat-icon"></i>
@@ -3745,7 +3815,7 @@ async function loadComplaintsMaster() {
     </div>
 
     <!-- Summary Stats -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+    <div class="grid-4" style="gap:12px;">
       <div class="card" style="padding:16px;display:flex;align-items:center;gap:12px;">
         <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#E8431A,#8B1A1A);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
           <i class="fas fa-layer-group" style="color:white;font-size:16px;"></i>
@@ -4254,7 +4324,7 @@ async function loadInternalComplaints(params = {}) {
     </div>
 
     <!-- Stats -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+    <div class="grid-4" style="gap:12px;">
       ${[
         [total,   'Total',      'fa-layer-group',  'linear-gradient(135deg,#7C3AED,#4C1D95)', 'all'],
         [pending, 'Pending',    'fa-clock',        'linear-gradient(135deg,#D97706,#92400E)', 'Pending'],
@@ -4294,7 +4364,8 @@ async function loadInternalComplaints(params = {}) {
       </button>
     </div>` : `
     <div class="card" style="overflow:hidden;">
-      <table style="width:100%;border-collapse:collapse;">
+      <div class="table-responsive">
+      <table style="width:100%;border-collapse:collapse;min-width:600px;">
         <thead>
           <tr style="background:#F9FAFB;border-bottom:1px solid #F3F4F6;">
             <th style="padding:11px 18px;text-align:left;font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;">Ref No.</th>
@@ -4334,6 +4405,7 @@ async function loadInternalComplaints(params = {}) {
           </tr>`).join('')}
         </tbody>
       </table>
+      </div>
     </div>`}
   </div>`
 }
@@ -4574,6 +4646,7 @@ window.addEventListener('load', boot)
 // Expose all functions to global scope
 Object.assign(window, {
   navigate, logout, doLogin, switchLoginTab, togglePwd, onSearch, markAllRead,
+  toggleSidebar, closeSidebar, mbnNav,
   showComplaintDetail, assignComplaint, scheduleVisit, resolveComplaint, closeComplaint,
   showRegisterComplaint, submitComplaint, filterComplaints, onCategoryChange,
   showUnitDetail, filterUnits, showRegisterComplaintForUnit, showAddComplaintForUnit: showRegisterComplaintForUnit,
