@@ -689,6 +689,7 @@ function showApp() {
         ${isStaff ? navItem('units', 'Unit Registry', 'fa-building') : ''}
         ${isStaff ? navItem('customers', 'Customer Master', 'fa-users') : ''}
         ${isStaff ? navItem('kyc-tracker', 'KYC Tracker', 'fa-id-card') : ''}
+        ${(isAdmin || isSubAdmin) ? navItem('kyc-review', 'KYC Review', 'fa-clipboard-check') : ''}
         ${(isAdmin || isSubAdmin) ? navItem('employees', 'Employees', 'fa-user-tie') : ''}
         ${isStaff ? navItem('vehicles', 'Vehicle Registry', 'fa-car') : ''}
 
@@ -865,6 +866,13 @@ function navigate(page, params = {}) {
       } else {
         loadKycTracker()
       }
+    },
+    'kyc-review': () => {
+      if (!isStaff || !['admin','sub_admin'].includes(currentUser?.role)) {
+        content.innerHTML = `<div class="empty-state"><i class="fas fa-lock"></i><p>Access restricted to Admin / Sub-Admin</p></div>`
+        return
+      }
+      loadKycReview()
     }
   }
   if (pages[page]) pages[page](params)
@@ -1172,11 +1180,81 @@ async function loadCustomerDashboard() {
   const d = r.data
   const cust = d.customer || {}
   const stats = d.stats || {}
-  const kyc = d.kyc_status || {}
 
-  const kycComplete = Object.values(kyc).every(v => v)
-  const kycDoneCount = Object.values(kyc).filter(v => v).length
-  const kycTotal = Object.keys(kyc).length
+  // Fetch live KYC status for the resident
+  const kycR = await api('GET', `/kyc/customer/${cust.id}`)
+  const kycData = kycR?.data || {}
+  const currentDocs = kycData.current_documents || []
+  const pendingReview = kycData.pending_review || []
+  const completionPct = kycData.completion_percentage ?? 0
+  const isMissing = (kycData.missing_types || []).length > 0
+
+  const KYC_DOCS = [
+    { key: 'aadhar',                label: 'Aadhar Card',           icon: 'fa-id-card',        color: '#3b82f6' },
+    { key: 'pan',                   label: 'PAN Card',              icon: 'fa-credit-card',    color: '#8b5cf6' },
+    { key: 'photo',                 label: 'Photograph',            icon: 'fa-camera',         color: '#ec4899' },
+    { key: 'sale_deed',             label: 'Sale Deed',             icon: 'fa-file-contract',  color: '#f59e0b' },
+    { key: 'maintenance_agreement', label: 'Maintenance Agreement', icon: 'fa-file-signature', color: '#10b981' },
+  ]
+
+  function kycDocCard(doc) {
+    const current = currentDocs.find(d => d.doc_type === doc.key)
+    const isPending = current && current.status === 'pending_review'
+    const isApproved = current && current.status === 'approved'
+    const isRejected = current && current.status === 'rejected'
+
+    let statusBadge = ''
+    let cardBg = 'background:#FEF2F2;border:1.5px solid #FECACA;'
+    let actionBtn = `<button onclick="openResidentKycUpload('${doc.key}','${doc.label}',${cust.id})"
+      class="w-full mt-2 text-xs px-3 py-1.5 rounded-lg font-semibold text-white transition-all hover:opacity-90"
+      style="background:${doc.color}">
+      <i class="fas fa-upload mr-1"></i>Upload Document
+    </button>`
+
+    if (isPending) {
+      statusBadge = `<span class="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-xs font-bold"><i class="fas fa-clock mr-0.5"></i>Under Review</span>`
+      cardBg = 'background:#FEFCE8;border:1.5px solid #FDE68A;'
+      actionBtn = `<button onclick="openResidentKycUpload('${doc.key}','${doc.label}',${cust.id})"
+        class="w-full mt-2 text-xs px-3 py-1.5 rounded-lg font-semibold bg-yellow-100 text-yellow-800 border border-yellow-200">
+        <i class="fas fa-redo mr-1"></i>Re-upload
+      </button>`
+    } else if (isApproved) {
+      statusBadge = `<span class="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-bold"><i class="fas fa-check-circle mr-0.5"></i>Approved</span>`
+      cardBg = 'background:#F0FDF4;border:1.5px solid #BBF7D0;'
+      actionBtn = `<button onclick="openResidentKycUpload('${doc.key}','${doc.label}',${cust.id})"
+        class="w-full mt-2 text-xs px-3 py-1.5 rounded-lg font-semibold bg-white text-blue-700 border border-blue-200 hover:bg-blue-50 transition-all">
+        <i class="fas fa-redo mr-1"></i>Update Document
+      </button>`
+    } else if (isRejected) {
+      statusBadge = `<span class="px-2 py-0.5 bg-red-100 text-red-600 rounded-full text-xs font-bold"><i class="fas fa-times-circle mr-0.5"></i>Rejected</span>`
+      cardBg = 'background:#FFF1F2;border:1.5px solid #FECDD3;'
+      actionBtn = `<button onclick="openResidentKycUpload('${doc.key}','${doc.label}',${cust.id})"
+        class="w-full mt-2 text-xs px-3 py-1.5 rounded-lg font-semibold text-white transition-all hover:opacity-90"
+        style="background:#ef4444">
+        <i class="fas fa-redo mr-1"></i>Re-upload
+      </button>`
+    }
+
+    const rejReason = isRejected && current.review_remarks
+      ? `<div class="mt-1 text-xs text-red-600 flex gap-1 items-start"><i class="fas fa-exclamation-triangle mt-0.5 flex-shrink-0"></i><span>${current.review_remarks}</span></div>`
+      : ''
+
+    return `
+    <div class="rounded-xl p-3 flex flex-col gap-1" style="${cardBg}">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background:${doc.color}20">
+            <i class="fas ${doc.icon} text-sm" style="color:${doc.color}"></i>
+          </div>
+          <span class="text-xs font-semibold text-gray-800">${doc.label}</span>
+        </div>
+        ${statusBadge}
+      </div>
+      ${isApproved && current ? `<div class="text-xs text-gray-400 pl-10">${formatDateTime(current.uploaded_at)}</div>` : ''}
+      ${rejReason}
+      ${actionBtn}
+    </div>`
+  }
 
   document.getElementById('pageContent').innerHTML = `
   <div class="page-header">
@@ -1229,22 +1307,46 @@ async function loadCustomerDashboard() {
     </div>
   </div>
 
-  <!-- KYC Status -->
+  <!-- KYC Status Card -->
   <div class="card p-5 mb-6">
-    <div class="flex items-center justify-between mb-3">
-      <h3 class="font-bold text-gray-800"><i class="fas fa-id-card mr-2 text-blue-600"></i>My KYC Status</h3>
-      <div class="${kycComplete ? 'text-green-600' : 'text-orange-500'} font-semibold text-sm">
-        ${kycDoneCount}/${kycTotal} documents uploaded
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h3 class="font-bold text-gray-800 flex items-center gap-2">
+          <i class="fas fa-id-card text-blue-600"></i>My KYC Documents
+        </h3>
+        <p class="text-xs text-gray-500 mt-0.5">Upload your identity documents for verification</p>
+      </div>
+      <div class="text-right">
+        <div class="font-bold text-sm ${completionPct===100 ? 'text-green-600' : isMissing ? 'text-orange-500' : 'text-blue-600'}">${completionPct}% Complete</div>
+        ${pendingReview.length > 0 ? `<div class="text-xs text-yellow-600 mt-0.5"><i class="fas fa-clock mr-1"></i>${pendingReview.length} under review</div>` : ''}
       </div>
     </div>
-    <div class="flex flex-wrap gap-3">
-      ${[['aadhar','Aadhar'],['pan','PAN'],['photo','Photograph'],['sale_deed','Sale Deed'],['maintenance_agreement','Maintenance Agreement']].map(([key,label]) => `
-      <div class="flex items-center gap-2 px-3 py-2 rounded-lg ${kyc[key] ? 'bg-green-50' : 'bg-red-50'}">
-        <i class="fas ${kyc[key] ? 'fa-check-circle text-green-500' : 'fa-times-circle text-red-400'}"></i>
-        <span class="text-xs font-medium ${kyc[key] ? 'text-green-700' : 'text-red-600'}">${label}</span>
-      </div>`).join('')}
+
+    <!-- Progress bar -->
+    <div class="w-full bg-gray-100 rounded-full h-2 mb-4">
+      <div class="h-2 rounded-full transition-all ${completionPct===100?'bg-green-500':completionPct>=60?'bg-yellow-400':'bg-red-400'}" style="width:${completionPct}%"></div>
     </div>
-    ${!kycComplete ? `<p class="text-xs text-orange-500 mt-3"><i class="fas fa-info-circle mr-1"></i>Please visit the facility office to complete your KYC documentation.</p>` : ''}
+
+    <!-- Document cards grid -->
+    <div class="grid md:grid-cols-2 xl:grid-cols-3 gap-3 mb-3">
+      ${KYC_DOCS.map(doc => kycDocCard(doc)).join('')}
+    </div>
+
+    ${completionPct === 100 && pendingReview.length === 0
+      ? `<div class="mt-2 p-3 bg-green-50 rounded-xl text-sm text-green-700 flex items-center gap-2">
+          <i class="fas fa-check-double text-green-500"></i>
+          <span class="font-semibold">KYC Complete!</span> All documents are verified and approved.
+        </div>`
+      : pendingReview.length > 0
+        ? `<div class="mt-2 p-3 bg-yellow-50 rounded-xl text-sm text-yellow-700 flex items-center gap-2">
+            <i class="fas fa-clock text-yellow-500"></i>
+            <span><strong>${pendingReview.length} document(s)</strong> are awaiting review by our staff. We'll notify you once they're processed.</span>
+          </div>`
+        : `<div class="mt-2 p-3 bg-blue-50 rounded-xl text-sm text-blue-700 flex items-center gap-2">
+            <i class="fas fa-info-circle text-blue-500"></i>
+            <span>Upload clear photos or scans of your documents. Our staff will verify and approve them.</span>
+          </div>`
+    }
   </div>
 
   <!-- Recent Complaints -->
@@ -2494,15 +2596,24 @@ function renderKycManagePanel(entityType, entityId, entityName, docList, kycData
 
           ${isUploaded && current ? `
           <!-- Latest version info -->
-          <div class="bg-green-50 rounded-lg p-3 mb-3 text-xs space-y-1">
-            <div class="flex justify-between">
-              <span class="font-semibold text-green-800">Version ${current.version} (Latest)</span>
-              <span class="text-green-600">${formatDateTime(current.uploaded_at)}</span>
+          <div class="${current.status === 'pending_review' ? 'bg-yellow-50' : current.status === 'rejected' ? 'bg-red-50' : 'bg-green-50'} rounded-lg p-3 mb-3 text-xs space-y-1">
+            <div class="flex justify-between items-center">
+              <span class="font-semibold ${current.status === 'pending_review' ? 'text-yellow-800' : current.status === 'rejected' ? 'text-red-800' : 'text-green-800'}">Version ${current.version} (Latest)</span>
+              <div class="flex items-center gap-1.5">
+                ${current.status === 'pending_review'
+                  ? `<span class="px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded font-bold text-xs"><i class="fas fa-clock mr-0.5"></i>Under Review</span>`
+                  : current.status === 'rejected'
+                    ? `<span class="px-1.5 py-0.5 bg-red-100 text-red-700 rounded font-bold text-xs"><i class="fas fa-times-circle mr-0.5"></i>Rejected</span>`
+                    : `<span class="px-1.5 py-0.5 bg-green-100 text-green-700 rounded font-bold text-xs"><i class="fas fa-check-circle mr-0.5"></i>Approved</span>`
+                }
+                <span class="${current.status === 'pending_review' ? 'text-yellow-600' : current.status === 'rejected' ? 'text-red-600' : 'text-green-600'}">${formatDateTime(current.uploaded_at)}</span>
+              </div>
             </div>
             <div class="text-gray-600 flex items-center gap-1">
               <i class="fas fa-user text-gray-400"></i>
-              ${current.uploaded_by_name || 'Staff'}
+              ${current.uploaded_by_name || 'Resident'}
             </div>
+            ${current.review_remarks ? `<div class="${current.status === 'rejected' ? 'text-red-600' : 'text-gray-500'} italic flex gap-1 items-start"><i class="fas fa-comment ${current.status === 'rejected' ? 'text-red-400' : 'text-gray-400'} mt-0.5"></i><span>${current.review_remarks}</span></div>` : ''}
             ${current.remarks ? `<div class="text-gray-500 italic"><i class="fas fa-comment mr-1"></i>${current.remarks}</div>` : ''}
             ${current.file_data && current.file_data.startsWith('data:image') ? `
             <div class="mt-2">
@@ -2545,21 +2656,33 @@ function renderKycManagePanel(entityType, entityId, entityName, docList, kycData
             <span class="text-blue-600">${versionCount} version${versionCount !== 1 ? 's' : ''}</span>
           </div>
           <div class="max-h-72 overflow-y-auto">
-            ${docHistory.map((h, idx) => `
-            <div class="px-4 py-3 border-t flex gap-3 ${idx===0 ? 'bg-green-50' : 'hover:bg-white'}">
-              <div class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold
-                ${idx===0 ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'}">
+            ${docHistory.map((h, idx) => {
+              const bgClass = idx === 0
+                ? (h.status === 'pending_review' ? 'bg-yellow-50' : h.status === 'rejected' ? 'bg-red-50' : 'bg-green-50')
+                : 'hover:bg-white'
+              const statusBadge = h.status === 'pending_review'
+                ? `<span class="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-semibold ml-1 flex-shrink-0"><i class="fas fa-clock mr-0.5"></i>Pending</span>`
+                : h.status === 'rejected'
+                  ? `<span class="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-semibold ml-1 flex-shrink-0"><i class="fas fa-times-circle mr-0.5"></i>Rejected</span>`
+                  : idx === 0
+                    ? `<span class="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-semibold ml-1 flex-shrink-0"><i class="fas fa-check-circle mr-0.5"></i>Latest</span>`
+                    : `<span class="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-semibold ml-1 flex-shrink-0">Approved</span>`
+              const vBubbleColor = h.status === 'pending_review' ? 'bg-yellow-400 text-white' : h.status === 'rejected' ? 'bg-red-400 text-white' : idx === 0 ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'
+              return `
+            <div class="px-4 py-3 border-t flex gap-3 ${bgClass}">
+              <div class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${vBubbleColor}">
                 v${h.version}
               </div>
               <div class="flex-1 min-w-0">
                 <div class="flex justify-between items-start">
                   <div class="text-xs font-semibold ${idx===0?'text-green-700':'text-gray-700'} truncate max-w-40">${h.file_name || doc.label}</div>
-                  ${idx===0 ? `<span class="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-semibold ml-1 flex-shrink-0">Latest</span>` : ''}
+                  ${statusBadge}
                 </div>
                 <div class="text-xs text-gray-500 mt-0.5">${formatDateTime(h.uploaded_at)}</div>
                 <div class="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
-                  <i class="fas fa-user"></i>${h.uploaded_by_name || 'Staff'}
+                  <i class="fas fa-user"></i>${h.uploaded_by_name || 'Resident'}
                 </div>
+                ${h.review_remarks ? `<div class="text-xs ${h.status === 'rejected' ? 'text-red-600' : 'text-gray-500'} italic mt-1 flex gap-1"><i class="fas fa-comment text-gray-400 mt-0.5"></i><span>${h.review_remarks}</span></div>` : ''}
                 ${h.remarks ? `<div class="text-xs text-gray-500 italic mt-1 flex gap-1"><i class="fas fa-comment text-gray-400 mt-0.5"></i><span>${h.remarks}</span></div>` : ''}
                 ${h.file_data && h.file_data.startsWith('data:image') ? `
                 <div class="mt-1.5">
@@ -2570,7 +2693,8 @@ function renderKycManagePanel(entityType, entityId, entityName, docList, kycData
                   <i class="fas fa-paperclip text-gray-400"></i>${h.file_name}
                 </div>` : ''}
               </div>
-            </div>`).join('')}
+            </div>`
+            }).join('')}
           </div>
         </div>` : ''}
       </div>`
@@ -2714,21 +2838,162 @@ async function submitKyc(entityType, entityId, docType) {
   await submitKycFromModal(entityType, entityId, docType, null)
 }
 
+// ═══════════════════════════════════════════════════════════════
+// RESIDENT SELF-UPLOAD KYC
+// Residents upload their own docs; status = 'pending_review'
+// Sub-admin then approves or rejects
+// ═══════════════════════════════════════════════════════════════
+
+function openResidentKycUpload(docType, docLabel, customerId) {
+  const KYC_DOCS = [
+    { key: 'aadhar',                label: 'Aadhar Card',           icon: 'fa-id-card',        color: '#3b82f6' },
+    { key: 'pan',                   label: 'PAN Card',              icon: 'fa-credit-card',    color: '#8b5cf6' },
+    { key: 'photo',                 label: 'Photograph',            icon: 'fa-camera',         color: '#ec4899' },
+    { key: 'sale_deed',             label: 'Sale Deed',             icon: 'fa-file-contract',  color: '#f59e0b' },
+    { key: 'maintenance_agreement', label: 'Maintenance Agreement', icon: 'fa-file-signature', color: '#10b981' },
+  ]
+  const doc = KYC_DOCS.find(d => d.key === docType) || { key: docType, label: docLabel || docType, icon: 'fa-file', color: '#6b7280' }
+
+  showModal(`
+  <div class="flex justify-between items-center mb-4">
+    <h2 class="text-lg font-bold flex items-center gap-2">
+      <i class="fas ${doc.icon}" style="color:${doc.color}"></i>
+      Upload – ${doc.label}
+    </h2>
+    <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button>
+  </div>
+
+  <div class="mb-4 p-3 bg-blue-50 rounded-xl text-sm text-blue-700 flex gap-2">
+    <i class="fas fa-info-circle mt-0.5 flex-shrink-0"></i>
+    <span>Your document will be reviewed by our staff and approved within 1–2 business days. You can re-upload anytime to replace a rejected document.</span>
+  </div>
+
+  <div class="mb-4">
+    <label class="form-label">Select File <span class="text-red-500">*</span></label>
+    <label class="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100 transition-all" id="resKycDropZone">
+      <div id="resKycDropLabel" class="flex flex-col items-center gap-2 text-gray-400">
+        <i class="fas fa-cloud-upload-alt text-3xl"></i>
+        <span class="text-sm font-medium">Click to select or drag & drop</span>
+        <span class="text-xs">Image or PDF · Max 5MB</span>
+      </div>
+      <input type="file" id="resKycFile" accept="image/*,application/pdf" class="hidden"/>
+    </label>
+  </div>
+
+  <div id="resKycPreviewCont" class="hidden mb-4 p-3 border rounded-xl bg-gray-50 text-center">
+    <img id="resKycPreview" class="max-h-48 rounded-lg mx-auto border shadow-sm mb-2"/>
+    <div id="resKycFileName" class="text-xs text-gray-500 font-medium"></div>
+  </div>
+
+  <div class="mb-5">
+    <label class="form-label">Remarks (optional)</label>
+    <input id="resKycRemarks" class="form-input" placeholder="e.g. Front side, Original document, etc."/>
+  </div>
+
+  <button onclick="submitResidentKycUpload('${doc.key}',${customerId})"
+    id="resKycSubmitBtn"
+    class="btn-primary w-full py-3 justify-center">
+    <i class="fas fa-paper-plane mr-2"></i>Submit for Review
+  </button>
+  `)
+
+  const fileInput = document.getElementById('resKycFile')
+  const dropZone = document.getElementById('resKycDropZone')
+
+  fileInput?.addEventListener('change', (e) => handleResKycFileSelect(e.target.files[0]))
+  dropZone?.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-blue-400','bg-blue-50') })
+  dropZone?.addEventListener('dragleave', () => dropZone.classList.remove('border-blue-400','bg-blue-50'))
+  dropZone?.addEventListener('drop', (e) => {
+    e.preventDefault()
+    dropZone.classList.remove('border-blue-400','bg-blue-50')
+    if (e.dataTransfer.files[0]) {
+      fileInput.files = e.dataTransfer.files
+      handleResKycFileSelect(e.dataTransfer.files[0])
+    }
+  })
+}
+
+function handleResKycFileSelect(file) {
+  if (!file) return
+  const maxSizeMB = 5
+  if (file.size > maxSizeMB * 1024 * 1024) {
+    toast(`File too large. Maximum size is ${maxSizeMB}MB`, 'error')
+    return
+  }
+  const label = document.getElementById('resKycDropLabel')
+  if (label) label.innerHTML = `<i class="fas fa-check-circle text-green-500 text-2xl"></i><span class="text-sm font-medium text-green-700">${file.name}</span><span class="text-xs text-gray-400">(${(file.size/1024).toFixed(1)} KB)</span>`
+
+  const preview = document.getElementById('resKycPreview')
+  const cont = document.getElementById('resKycPreviewCont')
+  const fname = document.getElementById('resKycFileName')
+  if (fname) fname.textContent = `${file.name} (${(file.size/1024).toFixed(1)} KB)`
+  if (cont) cont.classList.remove('hidden')
+
+  if (file.type.startsWith('image/') && preview) {
+    fileToBase64(file).then(data => {
+      preview.src = data
+      preview.style.display = ''
+    })
+  } else if (preview) {
+    preview.style.display = 'none'
+  }
+}
+
+async function submitResidentKycUpload(docType, customerId) {
+  const fileInput = document.getElementById('resKycFile')
+  const file = fileInput?.files[0]
+  if (!file) { toast('Please select a file', 'error'); return }
+
+  const remarks = document.getElementById('resKycRemarks')?.value?.trim() || ''
+  const btn = document.getElementById('resKycSubmitBtn')
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Uploading...' }
+
+  try {
+    const file_data = await fileToBase64(file)
+    const r = await api('POST', `/kyc/self/customer/${customerId}`, {
+      doc_type: docType, file_name: file.name, file_data, remarks
+    })
+
+    if (r?.ok) {
+      toast(r.data.message || 'Document submitted for review!', 'success')
+      closeModal()
+      // Reload the dashboard to show updated status
+      loadCustomerDashboard()
+    } else {
+      toast(r?.data?.error || 'Upload failed', 'error')
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane mr-2"></i>Submit for Review' }
+    }
+  } catch (e) {
+    toast('Upload failed. Please try again.', 'error')
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane mr-2"></i>Submit for Review' }
+  }
+}
+
 // ── KYC Tracker (summary page) ────────────────────────────────
 async function loadKycTracker(params = {}) {
   const r = await api('GET', '/kyc/tracker/summary')
   if (!r?.ok) return
-  const { owners = [], tenants = [] } = r.data
+  const { owners = [], tenants = [], pending_review_total = 0 } = r.data
+
+  // Update nav badge for pending review
+  updateKycNavBadge(pending_review_total)
 
   // Compute stats
   const ownerComplete = owners.filter(o => o.has_aadhar && o.has_pan && o.has_photo && o.has_sale_deed && o.has_maint_agr).length
   const tenantComplete = tenants.filter(t => t.has_contract && t.has_aadhar && t.has_pan && t.has_photo && t.has_police).length
+  const ownerPending = owners.filter(o => (o.pending_count || 0) > 0).length
+  const tenantPending = tenants.filter(t => (t.pending_count || 0) > 0).length
 
   document.getElementById('pageContent').innerHTML = `
   <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
     <h1 class="text-2xl font-bold text-gray-800"><i class="fas fa-id-card mr-2 text-blue-900"></i>KYC Tracker</h1>
     <div class="flex gap-3">
       <input type="text" id="kycSearch" placeholder="Search name, unit..." class="form-input w-56" oninput="filterKycTable('all', this.value)"/>
+      ${(pending_review_total > 0 && ['admin','sub_admin'].includes(currentUser?.role))
+        ? `<button onclick="navigate('kyc-review')" class="btn-primary btn-sm">
+            <i class="fas fa-clipboard-check mr-1"></i>Review Queue
+            <span class="ml-1.5 px-2 py-0.5 bg-white text-orange-600 rounded-full text-xs font-bold">${pending_review_total}</span>
+          </button>` : ''}
     </div>
   </div>
 
@@ -2750,6 +3015,11 @@ async function loadKycTracker(params = {}) {
       <div class="text-2xl font-bold text-purple-600">${tenantComplete}</div>
       <div class="text-xs text-gray-500 mt-1">Tenant KYC Complete</div>
     </div>
+    ${pending_review_total > 0 ? `
+    <div class="card p-4 text-center border-t-4 border-yellow-400 col-span-2 md:col-span-4 xl:col-span-1">
+      <div class="text-2xl font-bold text-yellow-600">${pending_review_total}</div>
+      <div class="text-xs text-gray-500 mt-1">Pending Review</div>
+    </div>` : ''}
   </div>
 
   <!-- Tabs -->
@@ -2786,9 +3056,13 @@ async function loadKycTracker(params = {}) {
             const vals = [o.has_aadhar, o.has_pan, o.has_photo, o.has_sale_deed, o.has_maint_agr]
             const done = vals.filter(Boolean).length
             const pct = Math.round(done/5*100)
-            return `<tr class="table-row border-t">
+            const hasPending = (o.pending_count || 0) > 0
+            return `<tr class="table-row border-t ${hasPending ? 'bg-yellow-50' : ''}">
               <td class="px-4 py-2 font-bold text-blue-900 cursor-pointer hover:underline" onclick="showUnitDetail('${o.unit_no}')">Unit ${o.unit_no}</td>
-              <td class="px-4 py-2 font-medium">${o.name}</td>
+              <td class="px-4 py-2 font-medium">
+                ${o.name}
+                ${hasPending ? `<span class="ml-1 px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-xs font-bold"><i class="fas fa-clock mr-0.5"></i>${o.pending_count} pending</span>` : ''}
+              </td>
               ${vals.map(v => `<td class="px-4 py-2 text-center">${v
                 ? '<i class="fas fa-check-circle text-green-500 text-base"></i>'
                 : '<i class="fas fa-times-circle text-red-400 text-base"></i>'}</td>`).join('')}
@@ -2836,9 +3110,13 @@ async function loadKycTracker(params = {}) {
             const pct = Math.round(done/5*100)
             const exp = t.tenancy_expiry
             const isExpired = exp && new Date(exp) < new Date()
-            return `<tr class="table-row border-t">
+            const hasPending = (t.pending_count || 0) > 0
+            return `<tr class="table-row border-t ${hasPending ? 'bg-yellow-50' : ''}">
               <td class="px-4 py-2 font-bold text-blue-900">Unit ${t.unit_no}</td>
-              <td class="px-4 py-2 font-medium">${t.name}</td>
+              <td class="px-4 py-2 font-medium">
+                ${t.name}
+                ${hasPending ? `<span class="ml-1 px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-xs font-bold"><i class="fas fa-clock mr-0.5"></i>${t.pending_count} pending</span>` : ''}
+              </td>
               ${vals.map(v => `<td class="px-4 py-2 text-center">${v
                 ? '<i class="fas fa-check-circle text-green-500 text-base"></i>'
                 : '<i class="fas fa-times-circle text-red-400 text-base"></i>'}</td>`).join('')}
@@ -2902,7 +3180,174 @@ function showKycTab(tab) {
   if (t) t.className = `px-5 py-3 text-sm font-semibold border-b-2 -mb-px ${tab==='tenants' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`
 }
 
-function filterKycTable(type, val) {
+// ═══════════════════════════════════════════════════════════════
+// KYC REVIEW PAGE — Sub-admin / Admin: Accept or Reject docs
+// ═══════════════════════════════════════════════════════════════
+async function loadKycReview() {
+  const content = document.getElementById('pageContent')
+  if (content) content.innerHTML = '<div class="loading"><div class="spinner"></div></div>'
+
+  const r = await api('GET', '/kyc/pending-review')
+  if (!r?.ok) { if (content) content.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-circle"></i><p>Failed to load KYC review queue</p></div>'; return }
+
+  const { pending = [], owner_doc_labels = {}, tenant_doc_labels = {}, count = 0 } = r.data
+
+  const docLabels = { ...owner_doc_labels, ...tenant_doc_labels }
+
+  function buildCard(doc) {
+    const label = docLabels[doc.doc_type] || doc.doc_type
+    const isImg = doc.file_data && doc.file_data.startsWith('data:image')
+    return `
+    <div class="card border-l-4 border-yellow-400 overflow-hidden" id="kycRevCard_${doc.id}">
+      <div class="p-4">
+        <!-- Header row -->
+        <div class="flex items-start justify-between gap-3 mb-3">
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-xs font-bold"><i class="fas fa-clock mr-0.5"></i>Pending Review</span>
+              <span class="text-xs text-gray-400">#${doc.id}</span>
+            </div>
+            <div class="font-bold text-gray-800 text-sm">${doc.entity_name || '—'}</div>
+            <div class="text-xs text-gray-500 flex items-center gap-2 mt-0.5">
+              <span class="flex items-center gap-1"><i class="fas fa-building text-gray-400"></i>Unit ${doc.unit_no || '—'}</span>
+              <span class="flex items-center gap-1"><i class="fas fa-user-tag text-gray-400"></i>${doc.entity_type === 'customer' ? 'Owner' : 'Tenant'}</span>
+            </div>
+          </div>
+          <div class="text-right flex-shrink-0">
+            <div class="font-semibold text-gray-700 text-sm">${label}</div>
+            <div class="text-xs text-gray-400 mt-0.5">v${doc.version} &bull; ${formatDateTime(doc.uploaded_at)}</div>
+            <div class="text-xs text-gray-400 mt-0.5 flex items-center justify-end gap-1">
+              <i class="fas fa-user text-gray-300"></i>${doc.uploaded_by_name || 'Resident'}
+            </div>
+          </div>
+        </div>
+
+        ${doc.remarks ? `<div class="mb-3 text-xs bg-gray-50 rounded-lg p-2 flex gap-1.5 items-start text-gray-600"><i class="fas fa-comment text-gray-400 mt-0.5 flex-shrink-0"></i><span>${doc.remarks}</span></div>` : ''}
+
+        <!-- Document preview -->
+        ${isImg
+          ? `<div class="mb-3 rounded-xl overflow-hidden border border-gray-200 bg-gray-50 text-center cursor-pointer"
+              onclick="viewDocumentImage('${doc.file_name || label}','${doc.file_data}')" title="Click to view full size">
+              <img src="${doc.file_data}" class="w-full max-h-40 object-cover hover:opacity-90 transition"/>
+              <div class="text-xs text-gray-400 py-1.5">${doc.file_name || label} — click to view full size</div>
+            </div>`
+          : `<div class="mb-3 flex items-center gap-2 p-3 bg-gray-50 rounded-xl border border-gray-200">
+              <i class="fas fa-file-alt text-gray-500 text-lg"></i>
+              <span class="text-sm text-gray-700 font-medium truncate">${doc.file_name || label}</span>
+              ${doc.file_data ? `<a href="${doc.file_data}" download="${doc.file_name || label}" class="ml-auto text-xs text-blue-600 hover:underline flex-shrink-0"><i class="fas fa-download mr-1"></i>Download</a>` : ''}
+            </div>`
+        }
+
+        <!-- Remarks input for rejection -->
+        <div class="mb-3">
+          <label class="text-xs font-semibold text-gray-600 block mb-1">Remarks (required for rejection, optional for approval)</label>
+          <input id="revRemarks_${doc.id}" class="form-input text-sm" placeholder="Enter reason for rejection or approval note..."/>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="flex gap-3">
+          <button onclick="reviewKycDoc(${doc.id},'approve')"
+            id="revApproveBtn_${doc.id}"
+            class="flex-1 px-4 py-2.5 rounded-xl font-semibold text-sm text-white bg-green-500 hover:bg-green-600 transition-all flex items-center justify-center gap-2">
+            <i class="fas fa-check-circle"></i>Approve
+          </button>
+          <button onclick="reviewKycDoc(${doc.id},'reject')"
+            id="revRejectBtn_${doc.id}"
+            class="flex-1 px-4 py-2.5 rounded-xl font-semibold text-sm text-white bg-red-500 hover:bg-red-600 transition-all flex items-center justify-center gap-2">
+            <i class="fas fa-times-circle"></i>Reject
+          </button>
+        </div>
+      </div>
+    </div>`
+  }
+
+  if (content) content.innerHTML = `
+  <div class="page-header">
+    <div class="page-title">
+      <div class="page-title-icon"><i class="fas fa-clipboard-check"></i></div>
+      <div>
+        <div>KYC Review Queue</div>
+        <div class="page-subtitle">Review and approve resident-submitted documents</div>
+      </div>
+    </div>
+    <button onclick="loadKycReview()" class="btn-secondary btn-sm"><i class="fas fa-sync-alt mr-1"></i>Refresh</button>
+  </div>
+
+  ${count === 0
+    ? `<div class="card p-10 text-center">
+        <i class="fas fa-check-double text-5xl text-green-400 mb-4 block"></i>
+        <div class="font-bold text-gray-700 text-lg mb-1">All Clear!</div>
+        <p class="text-gray-400 text-sm">No documents pending review. All submissions have been processed.</p>
+      </div>`
+    : `<div class="mb-4 flex items-center justify-between">
+        <div class="text-sm font-semibold text-gray-700">
+          <span class="px-3 py-1.5 bg-yellow-100 text-yellow-700 rounded-full">
+            <i class="fas fa-clock mr-1.5"></i>${count} document${count !== 1 ? 's' : ''} awaiting review
+          </span>
+        </div>
+        <div class="text-xs text-gray-400">Oldest first — review in order</div>
+      </div>
+      <div class="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+        ${pending.map(buildCard).join('')}
+      </div>`
+  }
+  `
+}
+
+async function reviewKycDoc(historyId, action) {
+  const remarks = document.getElementById(`revRemarks_${historyId}`)?.value?.trim() || ''
+
+  if (action === 'reject' && !remarks) {
+    toast('Please enter a rejection reason before rejecting', 'error')
+    document.getElementById(`revRemarks_${historyId}`)?.focus()
+    return
+  }
+
+  const approveBtn = document.getElementById(`revApproveBtn_${historyId}`)
+  const rejectBtn = document.getElementById(`revRejectBtn_${historyId}`)
+  if (approveBtn) approveBtn.disabled = true
+  if (rejectBtn) rejectBtn.disabled = true
+
+  const r = await api('POST', `/kyc/review/${historyId}`, { action, remarks })
+
+  if (r?.ok) {
+    toast(r.data.message || `Document ${action === 'approve' ? 'approved' : 'rejected'}!`, action === 'approve' ? 'success' : 'info')
+    // Fade out the card
+    const card = document.getElementById(`kycRevCard_${historyId}`)
+    if (card) {
+      card.style.transition = 'all 0.4s ease'
+      card.style.opacity = '0'
+      card.style.transform = 'scale(0.95)'
+      setTimeout(() => {
+        card.remove()
+        // Check if queue is now empty
+        const remaining = document.querySelectorAll('[id^="kycRevCard_"]').length
+        if (remaining === 0) loadKycReview()
+      }, 400)
+    }
+  } else {
+    toast(r?.data?.error || 'Action failed', 'error')
+    if (approveBtn) approveBtn.disabled = false
+    if (rejectBtn) rejectBtn.disabled = false
+  }
+}
+
+// Also update KYC tracker to show pending review badge
+function updateKycNavBadge(count) {
+  const navEl = document.getElementById('nav-kyc-review')
+  if (!navEl) return
+  const existing = navEl.querySelector('.kyc-badge')
+  if (existing) existing.remove()
+  if (count > 0) {
+    const badge = document.createElement('span')
+    badge.className = 'kyc-badge'
+    badge.style.cssText = 'background:#E8431A;color:white;font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px;margin-left:auto;'
+    badge.textContent = count
+    navEl.appendChild(badge)
+  }
+}
+
+
   const lv = val.toLowerCase()
   ;['kycOwnersBody', 'kycTenantsBody'].forEach(id => {
     const tbody = document.getElementById(id)
@@ -4664,6 +5109,10 @@ Object.assign(window, {
   navigateToManageKyc_owner, navigateToManageKyc_tenant,
   showAddEmployee, addEmployee, showEditEmployee, updateEmployee, showEmpDetails, showResetEmpPwd, resetEmpPwd,
   showModal, closeModal, loadKycTracker,
+  // Resident KYC self-upload
+  openResidentKycUpload, submitResidentKycUpload, handleResKycFileSelect,
+  // KYC Review (sub-admin)
+  loadKycReview, reviewKycDoc, updateKycNavBadge,
   // Calendar
   loadCalendar, switchCalView, calNavMonth, calNavWeek, showDayDetail, showApplyLeaveModal, submitLeaveApplication,
   // Leave
