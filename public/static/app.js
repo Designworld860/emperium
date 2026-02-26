@@ -700,7 +700,7 @@ function showApp() {
         ${isStaff ? navItem('internal-complaints', 'Internal Complaints', 'fa-comment-dots') : ''}
 
         <div class="nav-section-label" style="margin-top:4px;">System</div>
-        ${navItem('complaints-master', 'Complaints Master', 'fa-layer-group')}
+        ${isAdmin ? navItem('complaints-master', 'Complaints Master', 'fa-layer-group') : ''}
         ${navItem('notifications', 'Notifications', 'fa-bell')}
         ${(isAdmin || isSubAdmin) ? navItem('audit', 'Audit Trail', 'fa-history') : ''}
       </nav>
@@ -851,7 +851,13 @@ function navigate(page, params = {}) {
     calendar: loadCalendar,
     'leave-mgmt': loadLeaveManagement,
     vehicles: loadVehicles,
-    'complaints-master': loadComplaintsMaster,
+    'complaints-master': () => {
+      if (currentUser?.role !== 'admin') {
+        content.innerHTML = `<div class="empty-state"><i class="fas fa-lock"></i><p>Access restricted to Administrators only</p></div>`
+        return
+      }
+      loadComplaintsMaster()
+    },
     'internal-complaints': loadInternalComplaints,
     'kyc-manage': (p) => {
       if (p && p.ownerEntityType) {
