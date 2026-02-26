@@ -3347,7 +3347,7 @@ function updateKycNavBadge(count) {
   }
 }
 
-
+function filterKycTable(type, val) {
   const lv = val.toLowerCase()
   ;['kycOwnersBody', 'kycTenantsBody'].forEach(id => {
     const tbody = document.getElementById(id)
