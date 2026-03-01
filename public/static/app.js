@@ -587,7 +587,6 @@ function renderLoginPage() {
           <div class="lp-divider" style="margin-bottom:14px;">Quick Demo Access</div>
           <div class="lp-demo-grid">
             ${[
-              ['Admin',     'admin@emperiumcity.com',      'Admin@123',    'fa-crown',       '#DC2626','#FEF2F2'],
               ['Sub-Admin', 'subadmin@emperiumcity.com',   'SubAdmin@123', 'fa-user-shield', '#7C3AED','#F5F3FF'],
               ['Employee',  'rajesh@emperiumcity.com',     'Emp@123',      'fa-hard-hat',    '#0284C7','#EFF6FF'],
               ['Resident',  'kapoorminakshi124@gmail.com', 'Customer@123', 'fa-home',        '#059669','#F0FDF4']
@@ -3829,6 +3828,9 @@ async function loadLeaveManagement() {
   if (!r?.ok) { content.innerHTML = `<p class="text-red-500 p-6">Failed to load leaves</p>`; return }
   const { leaves = [], pendingCount = 0 } = r.data
 
+  const approvedCount = leaves.filter(l=>l.status==='Approved').length
+  const rejectedCount = leaves.filter(l=>l.status==='Rejected').length
+
   content.innerHTML = `
   <div style="display:flex;flex-direction:column;gap:18px;">
     <div class="page-header">
@@ -3840,13 +3842,57 @@ async function loadLeaveManagement() {
         </div>
       </div>
       <div class="page-actions">
-        ${isManager && pendingCount > 0 ? `<span style="background:#FFF7ED;color:#C2410C;border:1px solid #FED7AA;border-radius:20px;padding:5px 12px;font-size:12px;font-weight:700;">${pendingCount} Pending</span>` : ''}
         ${!isManager ? `<button onclick="showApplyLeaveModal()" class="btn-primary"><i class="fas fa-plus"></i>Apply Leave</button>` : ''}
       </div>
     </div>
+
+    ${isManager ? `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;">
+      <div style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:12px;padding:16px;display:flex;align-items:center;gap:12px;">
+        <div style="width:44px;height:44px;background:#F97316;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i class="fas fa-clock" style="color:#fff;font-size:18px;"></i>
+        </div>
+        <div>
+          <div style="font-size:24px;font-weight:800;color:#9A3412;">${pendingCount}</div>
+          <div style="font-size:12px;color:#C2410C;font-weight:600;">Pending Review</div>
+        </div>
+      </div>
+      <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:12px;padding:16px;display:flex;align-items:center;gap:12px;">
+        <div style="width:44px;height:44px;background:#22C55E;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i class="fas fa-check-circle" style="color:#fff;font-size:18px;"></i>
+        </div>
+        <div>
+          <div style="font-size:24px;font-weight:800;color:#14532D;">${approvedCount}</div>
+          <div style="font-size:12px;color:#16A34A;font-weight:600;">Approved</div>
+        </div>
+      </div>
+      <div style="background:#FFF1F2;border:1px solid #FECDD3;border-radius:12px;padding:16px;display:flex;align-items:center;gap:12px;">
+        <div style="width:44px;height:44px;background:#EF4444;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i class="fas fa-times-circle" style="color:#fff;font-size:18px;"></i>
+        </div>
+        <div>
+          <div style="font-size:24px;font-weight:800;color:#7F1D1D;">${rejectedCount}</div>
+          <div style="font-size:12px;color:#DC2626;font-weight:600;">Rejected</div>
+        </div>
+      </div>
+    </div>
+    ${pendingCount > 0 ? `
+    <div style="background:linear-gradient(135deg,#4F46E5,#7C3AED);border-radius:12px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;color:#fff;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <i class="fas fa-bell" style="font-size:18px;opacity:.9;"></i>
+        <div>
+          <div style="font-weight:700;font-size:14px;">${pendingCount} leave request${pendingCount>1?'s':''} awaiting your review</div>
+          <div style="font-size:12px;opacity:.8;">Click the <strong>Review</strong> button on any pending row to approve or reject</div>
+        </div>
+      </div>
+      <button onclick="filterLeaves('Pending')" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);color:#fff;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">
+        <i class="fas fa-filter mr-1"></i>Show Pending
+      </button>
+    </div>` : ''}` : ''}
+
     <div class="card" style="padding:14px 18px;">
       <div class="tab-group" style="display:inline-flex;">
-        ${['All','Pending','Approved','Rejected'].map(s => `<button onclick="filterLeaves('${s}')" id="leaveTab${s}" class="tab-pill${s==='All'?' active':''}">${s}</button>`).join('')}
+        ${['All','Pending','Approved','Rejected'].map(s => `<button onclick="filterLeaves('${s}')" id="leaveTab${s}" class="tab-pill${s==='All'?' active':''}">${s}${s==='Pending'&&pendingCount>0?` <span style="background:#EF4444;color:#fff;border-radius:10px;padding:0 6px;font-size:10px;font-weight:700;margin-left:4px;">${pendingCount}</span>`:''}</button>`).join('')}
       </div>
     </div>
     <div class="card">
@@ -3859,25 +3905,37 @@ async function loadLeaveManagement() {
 function renderLeaveTable(leaves, isManager) {
   if (!leaves.length) return `<div class="text-center py-8 text-gray-400"><i class="fas fa-calendar-times text-3xl mb-2"></i><p>No leave records found</p></div>`
   return `<div class="overflow-x-auto"><table class="w-full text-sm">
-    <thead><tr class="text-left text-xs text-gray-500 border-b">
-      ${isManager?'<th class="py-2 pr-4">Employee</th>':''}
-      <th class="py-2 pr-4">Leave Date</th><th class="py-2 pr-4">Type</th><th class="py-2 pr-4">Reason</th>
-      <th class="py-2 pr-4">Status</th><th class="py-2 pr-4">Applied On</th><th class="py-2">Actions</th>
+    <thead><tr class="text-left text-xs text-gray-500 border-b bg-gray-50">
+      ${isManager?'<th class="py-3 px-4">Employee</th>':''}
+      <th class="py-3 px-4">Leave Date</th><th class="py-3 px-4">Type</th><th class="py-3 px-4">Reason</th>
+      <th class="py-3 px-4">Status</th><th class="py-3 px-4">Applied On</th>
+      ${isManager?'<th class="py-3 px-4">Reviewed By</th>':''}
+      <th class="py-3 px-4">Actions</th>
     </tr></thead>
     <tbody class="divide-y">
-      ${leaves.map(l=>`<tr class="hover:bg-gray-50">
-        ${isManager?`<td class="py-2 pr-4 font-medium">${l.employee_name}<div class="text-xs text-gray-400">${l.department||''}</div></td>`:''}
-        <td class="py-2 pr-4 whitespace-nowrap font-medium">${formatDate(l.leave_date)}</td>
-        <td class="py-2 pr-4 text-xs">${l.leave_type}</td>
-        <td class="py-2 pr-4 text-xs text-gray-600 max-w-xs">${l.reason||'—'}</td>
-        <td class="py-2 pr-4">${leaveStatusBadge(l.status)}</td>
-        <td class="py-2 pr-4 text-xs text-gray-400">${formatDate(l.applied_at)}</td>
-        <td class="py-2">
+      ${leaves.map(l=>`<tr class="hover:bg-gray-50 ${l.status==='Pending'&&isManager?'bg-amber-50/40':''}">
+        ${isManager?`<td class="py-3 px-4">
+          <div class="font-medium text-gray-800">${l.employee_name}</div>
+          <div class="text-xs text-gray-400">${l.department||''}</div>
+        </td>`:''}
+        <td class="py-3 px-4 whitespace-nowrap font-semibold text-gray-700">${formatDate(l.leave_date)}</td>
+        <td class="py-3 px-4"><span class="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium">${l.leave_type}</span></td>
+        <td class="py-3 px-4 text-xs text-gray-600 max-w-xs">${l.reason||'—'}</td>
+        <td class="py-3 px-4">${leaveStatusBadge(l.status)}</td>
+        <td class="py-3 px-4 text-xs text-gray-400">${formatDate(l.applied_at)}</td>
+        ${isManager?`<td class="py-3 px-4 text-xs">
+          ${l.reviewer_name ? `<div class="text-gray-700 font-medium">${l.reviewer_name}</div><div class="text-gray-400">${l.reviewed_at ? formatDate(l.reviewed_at) : ''}</div>` : '<span class="text-gray-300">—</span>'}
+          ${l.review_remarks ? `<div class="text-xs text-gray-400 mt-0.5 italic">"${l.review_remarks.substring(0,40)}${l.review_remarks.length>40?'…':''}"</div>` : ''}
+        </td>`:''}
+        <td class="py-3 px-4">
           ${isManager&&l.status==='Pending'?`
-            <button onclick="reviewLeave(${l.id},'approve')" class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded mr-1 hover:bg-green-200"><i class="fas fa-check mr-1"></i>Approve</button>
-            <button onclick="reviewLeave(${l.id},'reject')" class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200"><i class="fas fa-times mr-1"></i>Reject</button>`:''}
-          ${!isManager&&l.status==='Pending'?`<button onclick="cancelLeave(${l.id})" class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded hover:bg-gray-200"><i class="fas fa-trash mr-1"></i>Cancel</button>`:''}
-          ${l.review_remarks?`<div class="text-xs text-gray-400 mt-1">Note: ${l.review_remarks.substring(0,40)}</div>`:''}
+            <div class="flex gap-1 flex-wrap">
+              <button onclick="showLeaveReviewModal(${l.id})" class="text-xs bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg font-medium hover:bg-indigo-100 transition-colors"><i class="fas fa-eye mr-1"></i>Review</button>
+            </div>`:
+            isManager&&l.status!=='Pending'?`<span class="text-xs text-gray-300">Reviewed</span>`:''
+          }
+          ${!isManager&&l.status==='Pending'?`<button onclick="cancelLeave(${l.id})" class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded hover:bg-gray-200 transition-colors"><i class="fas fa-trash mr-1"></i>Cancel</button>`:''}
+          ${!isManager&&l.status!=='Pending'?`<span class="text-xs text-gray-300">—</span>`:''}
         </td>
       </tr>`).join('')}
     </tbody></table></div>`
@@ -3896,6 +3954,93 @@ function filterLeaves(status) {
   const isManager = ['admin','sub_admin'].includes(currentUser.role)
   const filtered = status==='All' ? window._allLeaves : (window._allLeaves||[]).filter(l=>l.status===status)
   document.getElementById('leaveTableContainer').innerHTML = renderLeaveTable(filtered, isManager)
+}
+
+function showLeaveReviewModal(id) {
+  const leave = (window._allLeaves||[]).find(l => l.id === id)
+  if (!leave) return
+  const html = `
+  <div id="leaveReviewModal" style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;" onclick="if(event.target===this)closeLeaveReviewModal()">
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:480px;box-shadow:0 20px 60px rgba(0,0,0,.2);overflow:hidden;">
+      <!-- Header -->
+      <div style="background:linear-gradient(135deg,#4F46E5,#7C3AED);padding:20px 24px;color:#fff;display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="width:40px;height:40px;background:rgba(255,255,255,.2);border-radius:10px;display:flex;align-items:center;justify-content:center;">
+            <i class="fas fa-calendar-check" style="font-size:18px;"></i>
+          </div>
+          <div>
+            <div style="font-size:16px;font-weight:700;">Review Leave Request</div>
+            <div style="font-size:12px;opacity:.8;">Sub-Admin Decision</div>
+          </div>
+        </div>
+        <button onclick="closeLeaveReviewModal()" style="background:rgba(255,255,255,.2);border:none;color:#fff;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;">&times;</button>
+      </div>
+      <!-- Leave Details -->
+      <div style="padding:20px 24px;border-bottom:1px solid #F3F4F6;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div style="background:#F8FAFC;border-radius:10px;padding:12px;">
+            <div style="font-size:10px;color:#6B7280;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Employee</div>
+            <div style="font-size:14px;font-weight:700;color:#111827;">${leave.employee_name}</div>
+            <div style="font-size:11px;color:#6B7280;">${leave.department||''}</div>
+          </div>
+          <div style="background:#F8FAFC;border-radius:10px;padding:12px;">
+            <div style="font-size:10px;color:#6B7280;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Leave Date</div>
+            <div style="font-size:14px;font-weight:700;color:#111827;">${formatDate(leave.leave_date)}</div>
+            <div style="font-size:11px;color:#6B7280;">Applied: ${formatDate(leave.applied_at)}</div>
+          </div>
+          <div style="background:#F8FAFC;border-radius:10px;padding:12px;">
+            <div style="font-size:10px;color:#6B7280;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Leave Type</div>
+            <div style="font-size:13px;font-weight:600;color:#1D4ED8;">${leave.leave_type}</div>
+          </div>
+          <div style="background:#F8FAFC;border-radius:10px;padding:12px;">
+            <div style="font-size:10px;color:#6B7280;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Status</div>
+            <div>${leaveStatusBadge(leave.status)}</div>
+          </div>
+        </div>
+        ${leave.reason ? `
+        <div style="background:#FFF8F0;border:1px solid #FED7AA;border-radius:10px;padding:12px;margin-top:12px;">
+          <div style="font-size:10px;color:#92400E;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;"><i class="fas fa-comment-alt mr-1"></i>Reason / Remarks</div>
+          <div style="font-size:13px;color:#451A03;">${leave.reason}</div>
+        </div>` : ''}
+      </div>
+      <!-- Action Area -->
+      <div style="padding:20px 24px;">
+        <div style="margin-bottom:14px;">
+          <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:6px;"><i class="fas fa-pencil-alt mr-1 text-gray-400"></i>Remarks <span style="color:#9CA3AF;font-weight:400;">(required for rejection, optional for approval)</span></label>
+          <textarea id="leaveReviewRemarks" rows="3" placeholder="Add a note for the employee…" style="width:100%;border:1.5px solid #E5E7EB;border-radius:10px;padding:10px 12px;font-size:13px;resize:none;outline:none;transition:border-color .2s;box-sizing:border-box;" onfocus="this.style.borderColor='#6366F1'" onblur="this.style.borderColor='#E5E7EB'"></textarea>
+        </div>
+        <div style="display:flex;gap:10px;">
+          <button onclick="submitLeaveReview(${id},'approve')" style="flex:1;background:linear-gradient(135deg,#059669,#10B981);color:#fff;border:none;padding:12px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:opacity .2s;" onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='1'">
+            <i class="fas fa-check-circle"></i> Approve Leave
+          </button>
+          <button onclick="submitLeaveReview(${id},'reject')" style="flex:1;background:linear-gradient(135deg,#DC2626,#EF4444);color:#fff;border:none;padding:12px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:opacity .2s;" onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='1'">
+            <i class="fas fa-times-circle"></i> Reject Leave
+          </button>
+        </div>
+        <button onclick="closeLeaveReviewModal()" style="width:100%;margin-top:8px;background:#F3F4F6;color:#6B7280;border:none;padding:10px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;">Cancel</button>
+      </div>
+    </div>
+  </div>`
+  document.body.insertAdjacentHTML('beforeend', html)
+}
+
+function closeLeaveReviewModal() {
+  const m = document.getElementById('leaveReviewModal')
+  if (m) m.remove()
+}
+
+async function submitLeaveReview(id, action) {
+  const remarks = (document.getElementById('leaveReviewRemarks')?.value || '').trim()
+  if (action === 'reject' && !remarks) {
+    const el = document.getElementById('leaveReviewRemarks')
+    if (el) { el.style.borderColor = '#EF4444'; el.focus(); el.placeholder = 'Rejection reason is required…' }
+    toast('Please provide a reason for rejection', 'error')
+    return
+  }
+  closeLeaveReviewModal()
+  const r = await api('POST', `/calendar/leaves/${id}/${action}`, { remarks })
+  if (r?.ok) { toast(action==='approve' ? '✅ Leave approved!' : '❌ Leave rejected', action==='approve'?'success':'warning'); loadLeaveManagement() }
+  else toast(r?.data?.error || 'Action failed', 'error')
 }
 
 async function reviewLeave(id, action) {
@@ -5116,7 +5261,7 @@ Object.assign(window, {
   // Calendar
   loadCalendar, switchCalView, calNavMonth, calNavWeek, showDayDetail, showApplyLeaveModal, submitLeaveApplication,
   // Leave
-  loadLeaveManagement, filterLeaves, reviewLeave, cancelLeave,
+  loadLeaveManagement, filterLeaves, reviewLeave, cancelLeave, showLeaveReviewModal, closeLeaveReviewModal, submitLeaveReview,
   // Vehicles
   loadVehicles, showAddVehicleModal, submitVehicle, showVehicleDetail, showEditVehicle, updateVehicle, removeVehicle,
   viewRcDocument, filterVehicles, loadUnitResidents, previewRc, previewRcEdit,
