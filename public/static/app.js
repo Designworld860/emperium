@@ -438,6 +438,30 @@ function renderLoginPage() {
       content: ''; flex: 1; height: 1px; background: #F3F4F6;
     }
 
+    /* Demo rows */
+    .lp-demo-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+      animation: lp-fade-up .55s .2s ease both;
+    }
+    .lp-demo-row {
+      display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+      border-radius: 11px; cursor: pointer;
+      transition: all .18s;
+      border: 1.5px solid #F3F4F6;
+      background: #FAFAFA;
+    }
+    .lp-demo-row:hover {
+      background: #FFF5F3; border-color: rgba(232,67,26,.25);
+      transform: translateY(-1px);
+      box-shadow: 0 3px 10px rgba(232,67,26,.1);
+    }
+    .lp-demo-avatar {
+      width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .lp-demo-name { font-size: 11.5px; font-weight: 700; color: #374151; line-height: 1.2; }
+    .lp-demo-hint { font-size: 10px; color: #9CA3AF; }
+
     /* Footer */
     .lp-footer {
       text-align: center; font-size: 10.5px; color: #D1D5DB; margin-top: 24px;
@@ -557,6 +581,29 @@ function renderLoginPage() {
             Sign In Securely
           </button>
         </form>
+
+        <!-- Demo credentials -->
+        <div style="animation:lp-fade-up .55s .18s ease both;">
+          <div class="lp-divider" style="margin-bottom:14px;">Quick Demo Access</div>
+          <div class="lp-demo-grid">
+            ${[
+              ['Admin',     'admin@emperiumcity.com',      'Admin@123',    'fa-crown',       '#DC2626','#FEF2F2'],
+              ['Sub-Admin', 'subadmin@emperiumcity.com',   'SubAdmin@123', 'fa-user-shield', '#7C3AED','#F5F3FF'],
+              ['Employee',  'rajesh@emperiumcity.com',     'Emp@123',      'fa-hard-hat',    '#0284C7','#EFF6FF'],
+              ['Resident',  'kapoorminakshi124@gmail.com', 'Customer@123', 'fa-home',        '#059669','#F0FDF4']
+            ].map(([role,email,pwd,ic,color,bg])=>`
+            <div class="lp-demo-row" onclick="document.getElementById('loginEmail').value='${email}';document.getElementById('loginPwd').value='${pwd}';" title="${email}">
+              <div class="lp-demo-avatar" style="background:${bg};">
+                <i class="fas ${ic}" style="color:${color};font-size:11px;"></i>
+              </div>
+              <div style="flex:1;min-width:0;">
+                <div class="lp-demo-name">${role}</div>
+                <div class="lp-demo-hint" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${email.split('@')[0]}@…</div>
+              </div>
+              <i class="fas fa-chevron-right" style="color:#E8431A;font-size:8px;opacity:.4;flex-shrink:0;"></i>
+            </div>`).join('')}
+          </div>
+        </div>
 
         <!-- Footer -->
         <p class="lp-footer">&copy; 2026 Emperium City &nbsp;&bull;&nbsp; Grievance Redressal System &nbsp;&bull;&nbsp; v3.0</p>
