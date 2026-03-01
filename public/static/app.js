@@ -694,8 +694,8 @@ function showApp() {
         ${navItem('complaints', 'Complaints', 'fa-exclamation-circle')}
 
         ${isStaff ? `<div class="nav-section-label" style="margin-top:4px;">Management</div>` : ''}
-        ${isStaff ? navItem('units', 'Unit Registry', 'fa-building') : ''}
-        ${isStaff ? navItem('customers', 'Customer Master', 'fa-users') : ''}
+        ${(isAdmin || isSubAdmin) ? navItem('units', 'Unit Registry', 'fa-building') : ''}
+        ${(isAdmin || isSubAdmin) ? navItem('customers', 'Customer Master', 'fa-users') : ''}
         ${isStaff ? navItem('kyc-tracker', 'KYC Tracker', 'fa-id-card') : ''}
         ${(isAdmin || isSubAdmin) ? navItem('kyc-review', 'KYC Review', 'fa-clipboard-check') : ''}
         ${(isAdmin || isSubAdmin) ? navItem('employees', 'Employees', 'fa-user-tie') : ''}
@@ -897,8 +897,20 @@ function navigate(page, params = {}) {
   const pages = {
     dashboard: loadDashboard,
     complaints: loadComplaints,
-    units: loadUnits,
-    customers: loadCustomers,
+    units: () => {
+      if (currentUser?.role === 'employee') {
+        content.innerHTML = `<div class="empty-state"><i class="fas fa-lock"></i><p>Access restricted to Admin / Sub-Admin only</p></div>`
+        return
+      }
+      loadUnits()
+    },
+    customers: () => {
+      if (currentUser?.role === 'employee') {
+        content.innerHTML = `<div class="empty-state"><i class="fas fa-lock"></i><p>Access restricted to Admin / Sub-Admin only</p></div>`
+        return
+      }
+      loadCustomers()
+    },
     'kyc-tracker': loadKycTracker,
     employees: loadEmployees,
     notifications: loadNotifications,
@@ -1935,6 +1947,7 @@ async function loadUnits(params = {}) {
 
 function renderUnitRows(units) {
   const isStaff = currentUser && currentUser.type === 'employee'
+  const canEdit = ['admin','sub_admin'].includes(currentUser?.role)
   return units.map(u => {
     const status = u.unit_status || u.particulars || 'Vacant'
     return `
@@ -1948,7 +1961,7 @@ function renderUnitRows(units) {
       ${u.tenant_name ? `<div class="text-sm">${u.tenant_name}</div><div class="text-xs text-orange-400">${u.tenancy_expiry ? 'Exp: '+formatDate(u.tenancy_expiry) : ''}</div>` : '<span class="text-gray-300">—</span>'}
     </td>
     <td class="px-4 py-3" id="unit-status-cell-${u.id}">
-      ${isStaff ? `
+      ${canEdit ? `
       <div style="display:flex;align-items:center;gap:6px;">
         ${unitStatusBadge(status)}
         <button onclick="showUnitStatusModal(${u.id},'${u.unit_no}','${status}')"
@@ -2616,9 +2629,9 @@ function renderKycManagePanel(entityType, entityId, entityName, docList, kycData
       ${missingTypes.length > 0 ? `<span class="text-red-500 font-semibold"><i class="fas fa-times-circle mr-1"></i>${missingTypes.length} missing</span>` : ''}
       ${pct===100 ? `<span class="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold"><i class="fas fa-check-double mr-1"></i>KYC Complete</span>` : ''}
     </div>
-    <button onclick="openKycUploadModal('${entityType}',${entityId},null,'refreshManageKyc')" class="btn-primary btn-sm" id="quickUploadBtn_${entityType}_${entityId}">
+    ${['admin','sub_admin'].includes(currentUser?.role) ? `<button onclick="openKycUploadModal('${entityType}',${entityId},null,'refreshManageKyc')" class="btn-primary btn-sm" id="quickUploadBtn_${entityType}_${entityId}">
       <i class="fas fa-plus mr-1"></i>Upload New Document
-    </button>
+    </button>` : ''}
   </div>
 
   <!-- Document Cards Grid -->
@@ -2687,13 +2700,13 @@ function renderKycManagePanel(entityType, entityId, entityName, docList, kycData
 
           <!-- Action buttons -->
           <div class="flex gap-2">
-            <button onclick="openKycUploadModal('${entityType}',${entityId},'${doc.key}','refreshManageKyc')"
+            ${['admin','sub_admin'].includes(currentUser?.role) ? `<button onclick="openKycUploadModal('${entityType}',${entityId},'${doc.key}','refreshManageKyc')"
               class="flex-1 text-xs px-3 py-2 rounded-lg font-semibold border transition-all hover:shadow-sm
                 ${isUploaded ? 'bg-white border-blue-200 text-blue-700 hover:bg-blue-50' : 'text-white border-transparent hover:opacity-90'}"
               style="${isUploaded ? '' : 'background:' + doc.color}">
               <i class="fas fa-${isUploaded ? 'redo' : 'upload'} mr-1"></i>
               ${isUploaded ? 'Replace / Update' : 'Upload Now'}
-            </button>
+            </button>` : `<span class="flex-1 text-xs px-3 py-2 rounded-lg font-semibold border bg-gray-50 text-gray-400 border-gray-200 text-center"><i class="fas fa-eye mr-1"></i>View Only</span>`}
             ${versionCount > 0 ? `
             <button onclick="toggleDocHistory('hist_${entityType}_${entityId}_${doc.key}')"
               class="px-3 py-2 rounded-lg text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200">
@@ -4132,7 +4145,7 @@ async function loadVehicles() {
           <div class="page-subtitle">${vehicles.length} vehicle(s) registered across all units</div>
         </div>
       </div>
-      <button onclick="showAddVehicleModal()" class="btn-primary"><i class="fas fa-plus"></i>Register Vehicle</button>
+      ${['admin','sub_admin'].includes(currentUser?.role) ? `<button onclick="showAddVehicleModal()" class="btn-primary"><i class="fas fa-plus"></i>Register Vehicle</button>` : ''}
     </div>
     <div class="card" style="padding:14px 18px;">
       <div style="position:relative;">
@@ -4167,8 +4180,9 @@ function renderVehicleCards(vehicles) {
         </div>
         <div style="display:flex;gap:4px;">
           <button onclick="showVehicleDetail(${v.id})" class="btn-icon" style="color:#2563EB;background:#EFF6FF;border:1px solid #DBEAFE;" title="View"><i class="fas fa-eye" style="font-size:12px;"></i></button>
+          ${['admin','sub_admin'].includes(currentUser?.role) ? `
           <button onclick="showEditVehicle(${v.id})" class="btn-icon" style="color:#059669;background:#ECFDF5;border:1px solid #D1FAE5;" title="Edit"><i class="fas fa-edit" style="font-size:12px;"></i></button>
-          <button onclick="removeVehicle(${v.id})" class="btn-icon" style="color:#DC2626;background:#FEF2F2;border:1px solid #FECACA;" title="Remove"><i class="fas fa-trash" style="font-size:12px;"></i></button>
+          <button onclick="removeVehicle(${v.id})" class="btn-icon" style="color:#DC2626;background:#FEF2F2;border:1px solid #FECACA;" title="Remove"><i class="fas fa-trash" style="font-size:12px;"></i></button>` : ''}
         </div>
       </div>
       <!-- Details grid -->
@@ -4969,9 +4983,7 @@ async function loadInternalComplaints(params = {}) {
           <div class="page-subtitle">Employee-side issue tracker &bull; ${total} total</div>
         </div>
       </div>
-      <button onclick="showRegisterInternalComplaint()" class="btn-primary" style="background:linear-gradient(135deg,#7C3AED,#4C1D95);box-shadow:0 3px 14px rgba(124,58,237,0.35);">
-        <i class="fas fa-plus"></i>Raise Complaint
-      </button>
+      ${['admin','sub_admin'].includes(currentUser?.role) ? `<button onclick="showRegisterInternalComplaint()" class="btn-primary" style="background:linear-gradient(135deg,#7C3AED,#4C1D95);box-shadow:0 3px 14px rgba(124,58,237,0.35);"><i class="fas fa-plus"></i>Raise Complaint</button>` : ''}
     </div>
 
     <!-- Stats -->
@@ -5010,9 +5022,9 @@ async function loadInternalComplaints(params = {}) {
       <i class="fas fa-comment-slash" style="font-size:48px;margin-bottom:16px;display:block;opacity:0.3;"></i>
       <div style="font-size:16px;font-weight:600;margin-bottom:8px;">No internal complaints</div>
       <div style="font-size:13px;margin-bottom:16px;">Raise one to get started</div>
-      <button onclick="showRegisterInternalComplaint()" style="background:linear-gradient(135deg,#7C3AED,#4C1D95);color:white;border:none;border-radius:10px;padding:10px 24px;font-weight:700;cursor:pointer;">
+      ${['admin','sub_admin'].includes(currentUser?.role) ? `<button onclick="showRegisterInternalComplaint()" style="background:linear-gradient(135deg,#7C3AED,#4C1D95);color:white;border:none;border-radius:10px;padding:10px 24px;font-weight:700;cursor:pointer;">
         <i class="fas fa-plus" style="margin-right:6px;"></i>Raise Complaint
-      </button>
+      </button>` : ''}
     </div>` : `
     <div class="card" style="overflow:hidden;">
       <div class="table-responsive">
@@ -5138,7 +5150,7 @@ async function showInternalComplaintDetail(id) {
   const isManager = ['admin','sub_admin'].includes(currentUser?.role)
   const isOwner   = c.reported_by_employee_id == currentUser?.id
   const isAssigned= c.assigned_to_employee_id == currentUser?.id
-  const canAct    = isManager || isAssigned
+  const canAct    = isManager  // only admin/sub_admin can assign & update status
 
   // Load employees for assignment dropdown (managers only)
   let empList = []
