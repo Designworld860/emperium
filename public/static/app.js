@@ -259,7 +259,7 @@ function renderLoginPage() {
       display: flex; flex-direction: column; align-items: center; gap: 8px;
     }
     .lp-logo-img {
-      width: 160px;
+      width: 180px;
       animation: lp-breathe 4s ease-in-out infinite;
       display: block;
     }
@@ -329,19 +329,28 @@ function renderLoginPage() {
 
     /* Brand mark */
     .lp-brandmark {
-      display: flex; align-items: center; gap: 11px;
-      margin-bottom: 40px;
-      animation: lp-fade-right .5s ease both;
+      display: flex; flex-direction: column; align-items: center; gap: 0;
+      margin-bottom: 32px;
+      animation: lp-fade-up .5s ease both;
     }
-    .lp-brandmark-icon {
-      width: 44px; height: 44px; border-radius: 13px; flex-shrink: 0;
-      background: linear-gradient(135deg, #E8431A, #5C1010);
+    .lp-brandmark-logo-wrap {
       display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 6px 20px rgba(232,67,26,.35), 0 0 0 1px rgba(232,67,26,.2);
-      animation: lp-pulse-ring 3s ease infinite;
+      margin-bottom: 10px;
     }
-    .lp-brandmark-name { font-size: 16px; font-weight: 800; color: #111827; line-height: 1.15; letter-spacing: -.02em; }
-    .lp-brandmark-sub  { font-size: 10px; color: #9CA3AF; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; margin-top: 1px; }
+    .lp-brandmark-logo-wrap img {
+      width: 160px;
+      height: auto;
+      display: block;
+      filter: drop-shadow(0 4px 16px rgba(139,26,26,0.18));
+    }
+    .lp-brandmark-divider {
+      width: 48px; height: 2px;
+      background: linear-gradient(90deg, var(--ec-flame), var(--ec-maroon));
+      border-radius: 2px;
+      margin: 8px auto 10px;
+    }
+    .lp-brandmark-name { font-size: 13px; font-weight: 700; color: #4B1010; line-height: 1.3; letter-spacing: .06em; text-transform: uppercase; text-align: center; }
+    .lp-brandmark-sub  { font-size: 10px; color: #9CA3AF; font-weight: 600; text-transform: uppercase; letter-spacing: .12em; margin-top: 3px; text-align: center; }
 
     /* Heading */
     .lp-heading {
@@ -502,7 +511,7 @@ function renderLoginPage() {
 
         <!-- Logo Card -->
         <div class="lp-logo-card">
-          <img src="/static/emperium-logo.png" alt="Emperium City" class="lp-logo-img"/>
+          <img src="/static/emperium-bv-logo.png" alt="Emperium – Building Values" class="lp-logo-img"/>
           <div class="lp-logo-badge">Grievance Redressal System</div>
         </div>
       </div>
@@ -528,13 +537,12 @@ function renderLoginPage() {
 
         <!-- Brand mark -->
         <div class="lp-brandmark">
-          <div class="lp-brandmark-icon">
-            <i class="fas fa-shield-alt" style="color:#fff;font-size:18px;"></i>
+          <div class="lp-brandmark-logo-wrap">
+            <img src="/static/emperium-bv-logo.png" alt="Emperium – Building Values" />
           </div>
-          <div>
-            <div class="lp-brandmark-name">Emperium City</div>
-            <div class="lp-brandmark-sub">GRS Portal</div>
-          </div>
+          <div class="lp-brandmark-divider"></div>
+          <div class="lp-brandmark-name">Emperium City</div>
+          <div class="lp-brandmark-sub">Grievance Redressal Portal</div>
         </div>
 
         <!-- Heading -->
