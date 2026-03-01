@@ -662,6 +662,7 @@ function showApp() {
 
   const roleLabel = isAdmin ? 'Administrator' : isSubAdmin ? 'Sub Administrator' : isEmp ? 'Employee' : `Unit ${currentUser.unit_no}`
   const userInitial = (currentUser.name || 'U').charAt(0).toUpperCase()
+  const shortName = (currentUser.name || '').split(' ')[0] || 'User'
 
   document.getElementById('app').innerHTML = `
   <!-- Sidebar backdrop for mobile -->
@@ -705,7 +706,7 @@ function showApp() {
         ${(isAdmin || isSubAdmin) ? navItem('audit', 'Audit Trail', 'fa-history') : ''}
       </nav>
 
-      <!-- User panel -->
+      <!-- User panel (sidebar bottom) -->
       <div class="sidebar-user">
         <div class="user-card">
           <div class="user-avatar">${userInitial}</div>
@@ -724,25 +725,50 @@ function showApp() {
     <div class="main-area">
       <!-- Top bar -->
       <header class="topbar">
-        <!-- Hamburger (mobile) -->
+        <!-- Hamburger (mobile/tablet) -->
         <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Open menu">
           <i class="fas fa-bars"></i>
         </button>
 
-        <div class="topbar-search">
+        <!-- Search bar -->
+        <div class="topbar-search" id="topbarSearch">
           <i class="fas fa-search search-icon"></i>
           <input type="text" id="globalSearch"
             placeholder="Search units, complaints..."
             oninput="onSearch(this.value)"/>
           <div id="searchDropdown" class="hidden"></div>
         </div>
+
+        <!-- Search toggle for mobile -->
+        <button class="topbar-search-toggle" onclick="toggleTopbarSearch()" aria-label="Search" id="searchToggleBtn">
+          <i class="fas fa-search"></i>
+        </button>
+
         <div class="topbar-right">
+          <!-- Date (hidden on mobile) -->
           <div class="topbar-date">
-            <i class="fas fa-calendar mr-1.5" style="color:#E8431A"></i>${dayjs().format('ddd, D MMM YYYY')}
+            <i class="fas fa-calendar" style="color:#E8431A;margin-right:5px;"></i>${dayjs().format('ddd, D MMM YYYY')}
           </div>
+
+          <!-- Notifications -->
           <button onclick="navigate('notifications'); closeSidebar();" class="notif-btn" title="Notifications">
             <i class="fas fa-bell"></i>
             <span id="notifBadge" class="notif-dot hidden"></span>
+          </button>
+
+          <!-- User chip (desktop/tablet) -->
+          <div class="topbar-user-chip">
+            <div class="topbar-user-avatar">${userInitial}</div>
+            <div class="topbar-user-info">
+              <div class="topbar-user-name">${shortName}</div>
+              <div class="topbar-user-role">${roleLabel}</div>
+            </div>
+          </div>
+
+          <!-- Log Out button — always visible top-right -->
+          <button onclick="logout()" class="topbar-logout-btn" title="Log Out">
+            <i class="fas fa-sign-out-alt"></i>
+            <span class="topbar-logout-label">Log Out</span>
           </button>
         </div>
       </header>
@@ -773,16 +799,37 @@ function showApp() {
       <button class="mbn-item" id="mbn-notifications" onclick="mbnNav('notifications')">
         <i class="fas fa-bell mbn-icon"></i>
         <span class="mbn-label">Alerts</span>
+        <span id="mbnNotifDot" class="mbn-badge hidden"></span>
       </button>`}
-      <button class="mbn-item mbn-more" id="mbn-more" onclick="toggleSidebar()">
+      <button class="mbn-item" id="mbn-more" onclick="toggleSidebar()">
         <i class="fas fa-th-large mbn-icon"></i>
         <span class="mbn-label">More</span>
+      </button>
+      <button class="mbn-item mbn-logout" onclick="logout()">
+        <i class="fas fa-sign-out-alt mbn-icon"></i>
+        <span class="mbn-label">Log Out</span>
       </button>
     </div>
   </nav>`
 
   navigate('dashboard')
   loadNotifCount()
+}
+
+function toggleTopbarSearch() {
+  const search = document.getElementById('topbarSearch')
+  const btn = document.getElementById('searchToggleBtn')
+  const input = document.getElementById('globalSearch')
+  if (!search) return
+  const isVisible = search.classList.contains('search-expanded')
+  if (isVisible) {
+    search.classList.remove('search-expanded')
+    btn.innerHTML = '<i class="fas fa-search"></i>'
+  } else {
+    search.classList.add('search-expanded')
+    btn.innerHTML = '<i class="fas fa-times"></i>'
+    setTimeout(() => input && input.focus(), 50)
+  }
 }
 
 function navItem(page, label, icon) {
@@ -5242,7 +5289,7 @@ window.addEventListener('load', boot)
 // Expose all functions to global scope
 Object.assign(window, {
   navigate, logout, doLogin, switchLoginTab, togglePwd, onSearch, markAllRead,
-  toggleSidebar, closeSidebar, mbnNav,
+  toggleSidebar, closeSidebar, mbnNav, toggleTopbarSearch,
   showComplaintDetail, assignComplaint, scheduleVisit, resolveComplaint, closeComplaint,
   showRegisterComplaint, submitComplaint, filterComplaints, onCategoryChange,
   showUnitDetail, filterUnits, showRegisterComplaintForUnit, showAddComplaintForUnit: showRegisterComplaintForUnit,

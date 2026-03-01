@@ -1189,7 +1189,131 @@ function getHTML(): string {
       .topbar-date { display: none; }
     }
 
-    /* ── MOBILE (< 768px) ────────────────────────────────────── */
+    /* ─── TOP BAR — LOGOUT & USER CHIP ──────────────────────── */
+    .topbar-user-chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 10px 5px 5px;
+      border-radius: 10px;
+      border: 1.5px solid #E8D8D5;
+      background: #FFF9F8;
+      cursor: default;
+    }
+    .topbar-user-avatar {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--ec-flame), var(--ec-maroon));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 800;
+      font-size: 11px;
+      flex-shrink: 0;
+    }
+    .topbar-user-name  { font-size: 12px; font-weight: 700; color: #1F2937; line-height: 1.2; }
+    .topbar-user-role  { font-size: 10px; color: #9CA3AF; line-height: 1.2; }
+    .topbar-user-info  { display: flex; flex-direction: column; }
+
+    /* ── Log Out button ─────────────────────────────────────── */
+    .topbar-logout-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border-radius: 9px;
+      border: 1.5px solid #FECACA;
+      background: #FEF2F2;
+      color: #DC2626;
+      font-size: 12.5px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.18s;
+      flex-shrink: 0;
+      white-space: nowrap;
+      font-family: inherit;
+    }
+    .topbar-logout-btn:hover {
+      background: #DC2626;
+      color: white;
+      border-color: #DC2626;
+      box-shadow: 0 3px 10px rgba(220,38,38,0.3);
+      transform: translateY(-1px);
+    }
+    .topbar-logout-btn:active { transform: translateY(0); }
+    .topbar-logout-label { font-size: 12.5px; font-weight: 700; }
+
+    /* ── Mobile search toggle button ────────────────────────── */
+    .topbar-search-toggle {
+      display: none;
+      width: 36px; height: 36px;
+      border-radius: 9px;
+      border: 1.5px solid #E8D8D5;
+      background: white;
+      color: #6B7280;
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      transition: all 0.18s;
+      flex-shrink: 0;
+    }
+    .topbar-search-toggle:hover { border-color: var(--ec-flame); color: var(--ec-flame); }
+
+    /* ── Mobile bottom nav logout ───────────────────────────── */
+    .mbn-logout {
+      color: #EF4444 !important;
+    }
+    .mbn-logout:active, .mbn-logout:hover { color: #DC2626 !important; }
+    .mbn-badge {
+      position: absolute;
+      top: 4px; right: 6px;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--ec-flame);
+      border: 2px solid white;
+    }
+
+    /* ── SMALL MOBILE (< 400px) ──────────────────────────────── */
+    @media (max-width: 399px) {
+      .grid-2 { grid-template-columns: 1fr; }
+      .mbn-label { display: none; }
+      .mbn-icon { font-size: 20px; }
+      .mbn-inner { height: 52px; }
+    }
+
+    /* ── DESKTOP (≥ 1024px) ──────────────────────────────────── */
+    @media (min-width: 1024px) {
+      .stats-row { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+      .grid-5 { grid-template-columns: repeat(5, 1fr); }
+      .grid-4 { grid-template-columns: repeat(4, 1fr); }
+      .grid-3 { grid-template-columns: repeat(3, 1fr); }
+      .grid-2 { grid-template-columns: repeat(2, 1fr); }
+      /* Hide search toggle on desktop – show full search */
+      .topbar-search-toggle { display: none !important; }
+      .topbar-search { display: flex !important; opacity: 1 !important; width: auto !important; }
+    }
+
+    /* ── LARGE DESKTOP (≥ 1280px) ────────────────────────────── */
+    @media (min-width: 1280px) {
+      :root { --sidebar-w: 260px; }
+      .page-wrap { padding: 28px 32px; }
+    }
+
+    /* ── TABLET (640px – 1023px) — overrides ────────────────── */
+    @media (max-width: 1023px) and (min-width: 768px) {
+      /* Hide text label on logout btn, show only icon */
+      .topbar-logout-label { display: none; }
+      .topbar-logout-btn { padding: 7px 10px; gap: 0; }
+      /* Hide user chip name/role info, keep avatar */
+      .topbar-user-info { display: none; }
+      .topbar-user-chip { padding: 5px; gap: 0; }
+      /* Hide topbar date */
+      .topbar-date { display: none; }
+    }
+
+    /* ── MOBILE (< 768px) — overrides ──────────────────────── */
     @media (max-width: 767px) {
       /* Sidebar slides in/out as drawer */
       .sidebar {
@@ -1215,17 +1339,52 @@ function getHTML(): string {
       .page-wrap { padding-bottom: calc(70px + env(safe-area-inset-bottom, 8px)); }
 
       /* Topbar */
-      .topbar { padding: 0 12px; height: 52px; gap: 10px; }
-      .topbar-search { max-width: none; flex: 1; }
-      .topbar-search input { font-size: 12.5px; padding: 6px 12px 6px 32px; }
-      .topbar-date { display: none; }
+      .topbar { padding: 0 10px; height: 52px; gap: 8px; }
+
+      /* Search: hidden by default on mobile, expands on toggle */
+      .topbar-search {
+        display: none;
+        position: absolute;
+        top: 52px; left: 0; right: 0;
+        background: white;
+        padding: 8px 12px;
+        border-bottom: 1px solid #EDEAE9;
+        z-index: 100;
+        max-width: 100%;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      }
+      .topbar-search.search-expanded {
+        display: flex;
+      }
+      .topbar-search input {
+        font-size: 14px;
+        padding: 9px 14px 9px 36px;
+        border-radius: 10px;
+      }
+
+      /* Show search toggle icon button */
+      .topbar-search-toggle { display: flex; }
+
+      /* Hide date always on mobile */
+      .topbar-date { display: none !important; }
+
+      /* Hide desktop user chip on mobile (user info in sidebar) */
+      .topbar-user-chip { display: none !important; }
+
+      /* Logout button: icon only on mobile topbar */
+      .topbar-logout-label { display: none; }
+      .topbar-logout-btn {
+        padding: 7px 10px;
+        gap: 0;
+        font-size: 14px;
+      }
 
       /* Page content */
       .page-wrap { padding: 14px 12px; }
       .page-title { font-size: 16px; }
       .page-title-icon { width: 32px; height: 32px; font-size: 13px; }
-      .page-header { margin-bottom: 14px; gap: 10px; }
-      .page-actions { gap: 6px; }
+      .page-header { margin-bottom: 14px; gap: 8px; }
+      .page-actions { gap: 6px; flex-wrap: wrap; }
       .page-actions .btn-primary,
       .page-actions .btn-ghost,
       .page-actions .btn-outline { padding: 7px 12px; font-size: 12px; }
@@ -1293,29 +1452,10 @@ function getHTML(): string {
 
       /* Pipeline pills wrap */
       .pipeline-pill { flex-direction: column; align-items: flex-start; gap: 4px; }
-    }
 
-    /* ── SMALL MOBILE (< 400px) ──────────────────────────────── */
-    @media (max-width: 399px) {
-      .grid-2 { grid-template-columns: 1fr; }
-      .mbn-label { display: none; }
-      .mbn-icon { font-size: 20px; }
-      .mbn-inner { height: 52px; }
-    }
-
-    /* ── DESKTOP (≥ 1024px) ──────────────────────────────────── */
-    @media (min-width: 1024px) {
-      .stats-row { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
-      .grid-5 { grid-template-columns: repeat(5, 1fr); }
-      .grid-4 { grid-template-columns: repeat(4, 1fr); }
-      .grid-3 { grid-template-columns: repeat(3, 1fr); }
-      .grid-2 { grid-template-columns: repeat(2, 1fr); }
-    }
-
-    /* ── LARGE DESKTOP (≥ 1280px) ────────────────────────────── */
-    @media (min-width: 1280px) {
-      :root { --sidebar-w: 260px; }
-      .page-wrap { padding: 28px 32px; }
+      /* Overflow-x auto for leave/kyc tables on mobile */
+      .overflow-x-auto { -webkit-overflow-scrolling: touch; }
+      table { min-width: 580px; }
     }
   </style>
 </head>
